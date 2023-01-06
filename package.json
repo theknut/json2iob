@@ -1,0 +1,25 @@
+{
+  "name": "@ta2k/json2iob",
+  "version": "2.0.0",
+  "description": "Conver Json to ioBroker Objects",
+  "author": "TA2k <tombox2020@gmail.com>",
+  "contributors": [],
+  "homepage": "",
+  "license": "MIT",
+  "keywords": [
+    "iobroker",
+    "adapter",
+    "json"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/TA2k/json2iob"
+  },
+  "dependencies": {
+    "json-bigint": "^1.0.0"
+  },
+  "bugs": {
+    "url": "https://github.com/TA2k/json2iob/issues"
+  },
+  "main": "index.js"
+}
