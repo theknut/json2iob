@@ -1,5 +1,5 @@
 {
-  "name": "@ta2k/json2iob",
+  "name": "json2iob",
   "version": "2.0.0",
   "description": "Conver Json to ioBroker Objects",
   "author": "TA2k <tombox2020@gmail.com>",
@@ -17,6 +17,9 @@
   },
   "dependencies": {
     "json-bigint": "^1.0.0"
+  },
+  "devDependencies": {
+    "@tsconfig/node14": "^1.0.3"
   },
   "bugs": {
     "url": "https://github.com/TA2k/json2iob/issues"
