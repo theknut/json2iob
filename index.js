@@ -8,12 +8,14 @@ preferedArrayName //set key to use this as an array entry name
 preferedArrayDec //set key to use this as an array entry description
 autoCast (true false) // make JSON.parse to parse numbers correctly
 descriptions: Object of names for state keys
+states: Object of states to create for an id, new entries via json will be added automatically to the states
 */
 const JSONbig = require("json-bigint")({ storeAsString: true });
 module.exports = class Json2iob {
   constructor(adapter) {
     this.adapter = adapter;
     this.alreadyCreatedObjects = {};
+    this.objectTypes = {};
   }
 
   async parse(path, element, options) {
@@ -36,25 +38,28 @@ module.exports = class Json2iob {
       if (typeof element === "string" || typeof element === "number") {
         const lastPathElement = path.split(".").pop();
 
-        if (!this.alreadyCreatedObjects[path]) {
-          await this.adapter
-            .extendObjectAsync(path, {
-              type: "state",
-              common: {
-                name: lastPathElement,
-                role: this.getRole(element, options.write),
-                type: element !== null ? typeof element : "mixed",
-                write: options.write,
-                read: true,
-              },
-              native: {},
-            })
-            .then(() => {
-              this.alreadyCreatedObjects[path] = true;
-            })
-            .catch((error) => {
-              this.adapter.log.error(error);
-            });
+        if (!this.alreadyCreatedObjects[path] || this.objectTypes[path] !== typeof element) {
+          let type = element !== null ? typeof element : "mixed";
+          if (this.objectTypes[path] && this.objectTypes[path] !== typeof element) {
+            type = "mixed";
+            this.adapter.log.debug(`Type changed for ${path} from ${this.objectTypes[path]} to ${type}`);
+          }
+          let states;
+          if (options.states && options.states[path]) {
+            states = options.states[path];
+            if (!states[element]) {
+              states[element] = element;
+            }
+          }
+          const common = {
+            name: lastPathElement,
+            role: this.getRole(element, options.write),
+            type: type,
+            write: options.write,
+            read: true,
+            states: states,
+          };
+          await this.createState(path, common);
         }
         await this.adapter.setStateAsync(path, element, true);
 
@@ -99,32 +104,42 @@ module.exports = class Json2iob {
           await this.parse(path + "." + key, element[key], options);
         } else {
           const pathKey = key.replace(/\./g, "_");
-          if (!this.alreadyCreatedObjects[path + "." + pathKey]) {
+          if (
+            !this.alreadyCreatedObjects[path + "." + pathKey] ||
+            this.objectTypes[path + "." + pathKey] !== typeof element[key]
+          ) {
             let objectName = key;
             if (options.descriptions && options.descriptions[key]) {
               objectName = options.descriptions[key];
             }
-            const type = element[key] !== null ? typeof element[key] : "mixed";
+            let type = element[key] !== null ? typeof element[key] : "mixed";
+            if (
+              this.objectTypes[path + "." + pathKey] &&
+              this.objectTypes[path + "." + pathKey] !== typeof element[key]
+            ) {
+              type = "mixed";
+              this.adapter.log.debug(
+                `Type changed for ${path + "." + pathKey} from ${this.objectTypes[path + "." + pathKey]} to ${type}`,
+              );
+            }
+            let states;
+            if (options.states && options.states[key]) {
+              states = options.states[key];
+              if (!states[element[key]]) {
+                states[element[key]] = element[key];
+              }
+            }
+
             const common = {
               name: objectName,
               role: this.getRole(element[key], options.write),
               type: type,
               write: options.write,
               read: true,
+              states: states,
             };
 
-            await this.adapter
-              .extendObjectAsync(path + "." + pathKey, {
-                type: "state",
-                common: common,
-                native: {},
-              })
-              .then(() => {
-                this.alreadyCreatedObjects[path + "." + pathKey] = true;
-              })
-              .catch((error) => {
-                this.adapter.log.error(error);
-              });
+            await this.createState(path + "." + pathKey, common);
           }
           await this.adapter.setStateAsync(path + "." + pathKey, element[key], true);
         }
@@ -134,6 +149,22 @@ module.exports = class Json2iob {
       this.adapter.log.error(error);
     }
   }
+  async createState(path, common) {
+    await this.adapter
+      .extendObjectAsync(path, {
+        type: "state",
+        common: common,
+        native: {},
+      })
+      .then(() => {
+        this.alreadyCreatedObjects[path] = true;
+        this.objectTypes[path] = common.type;
+      })
+      .catch((error) => {
+        this.adapter.log.error(error);
+      });
+  }
+
   async extractArray(element, key, path, options) {
     try {
       if (key) {
@@ -145,7 +176,9 @@ module.exports = class Json2iob {
           this.adapter.log.debug("Cannot extract empty: " + path + "." + key + "." + index);
           continue;
         }
+        // @ts-ignore
         index = parseInt(index) + 1;
+        // @ts-ignore
         if (index < 10) {
           index = "0" + index;
         }
@@ -195,6 +228,7 @@ module.exports = class Json2iob {
         if (arrayElement.start_date_time) {
           arrayPath = arrayElement.start_date_time.replace(/\./g, "");
         }
+
         if (options.preferedArrayName && options.preferedArrayName.indexOf("+") !== -1) {
           const preferedArrayNameArray = options.preferedArrayName.split("+");
           if (arrayElement[preferedArrayNameArray[0]]) {
@@ -242,22 +276,35 @@ module.exports = class Json2iob {
           if (key) {
             subKey = key + "." + subKey;
           }
-          if (!this.alreadyCreatedObjects[path + "." + subKey]) {
-            await this.adapter
-              .extendObjectAsync(path + "." + subKey, {
-                type: "state",
-                common: {
-                  name: subName,
-                  role: this.getRole(subValue, options.write),
-                  type: subValue !== null ? typeof subValue : "mixed",
-                  write: options.write,
-                  read: true,
-                },
-                native: {},
-              })
-              .then(() => {
-                this.alreadyCreatedObjects[path + "." + subKey] = true;
-              });
+          if (
+            !this.alreadyCreatedObjects[path + "." + subKey] ||
+            this.objectTypes[path + "." + subKey] !== typeof subValue
+          ) {
+            let type = subValue !== null ? typeof subValue : "mixed";
+            if (this.objectTypes[path + "." + subKey] && this.objectTypes[path + "." + subKey] !== typeof subValue) {
+              this.adapter.log.debug(
+                `Type of ${path + "." + subKey} changed from ${
+                  this.objectTypes[path + "." + subKey]
+                } to ${typeof subValue}!`,
+              );
+              type = "mixed";
+            }
+            let states;
+            if (options.states && options.states[subKey]) {
+              states = options.states[subKey];
+              if (!states[subValue]) {
+                states[subValue] = subValue;
+              }
+            }
+            const common = {
+              name: subName,
+              role: this.getRole(subValue, options.write),
+              type: type,
+              write: options.write,
+              read: true,
+              states: states,
+            };
+            await this.createState(path + "." + subKey, common);
           }
           await this.adapter.setStateAsync(path + "." + subKey, subValue, true);
           continue;
