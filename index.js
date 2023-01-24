@@ -1,4 +1,3 @@
-//v2.0
 /*
 options:
 write //set common write variable to true
@@ -9,6 +8,8 @@ preferedArrayDec //set key to use this as an array entry description
 autoCast (true false) // make JSON.parse to parse numbers correctly
 descriptions: Object of names for state keys
 states: Object of states to create for an id, new entries via json will be added automatically to the states
+parseBase64: (true false) // parse base64 encoded strings to utf8
+parseBase64byIds: Array of ids to parse base64 encoded strings to utf8
 */
 const JSONbig = require("json-bigint")({ storeAsString: true });
 module.exports = class Json2iob {
@@ -25,6 +26,19 @@ module.exports = class Json2iob {
         return;
       }
 
+      if (
+        (options.parseBase64 && this.isBase64(element)) ||
+        (options.parseBase64byIds && options.parseBase64byIds.includes(path))
+      ) {
+        try {
+          element = Buffer.from(element, "base64").toString("utf8");
+          if (this.isJsonString(element)) {
+            element = JSONbig.parse(element);
+          }
+        } catch (error) {
+          this.adapter.log.warn(`Cannot parse base64 for ${path}: ${error}`);
+        }
+      }
       const objectKeys = Object.keys(element);
 
       if (!options || !options.write) {
@@ -96,6 +110,20 @@ module.exports = class Json2iob {
       for (const key of objectKeys) {
         if (this.isJsonString(element[key]) && options.autoCast) {
           element[key] = JSONbig.parse(element[key]);
+        }
+
+        if (
+          (options.parseBase64 && this.isBase64(element[key])) ||
+          (options.parseBase64byIds && options.parseBase64byIds.includes(key))
+        ) {
+          try {
+            element[key] = Buffer.from(element[key], "base64").toString("utf8");
+            if (this.isJsonString(element[key])) {
+              element[key] = JSONbig.parse(element[key]);
+            }
+          } catch (error) {
+            this.adapter.log.warn(`Cannot parse base64 for ${path + "." + key}: ${error}`);
+          }
         }
 
         if (Array.isArray(element[key])) {
@@ -271,7 +299,22 @@ module.exports = class Json2iob {
           arrayElement[Object.keys(arrayElement)[0]] !== "null"
         ) {
           let subKey = arrayElement[Object.keys(arrayElement)[0]];
-          const subValue = arrayElement[Object.keys(arrayElement)[1]];
+          let subValue = arrayElement[Object.keys(arrayElement)[1]];
+
+          if (
+            (options.parseBase64 && this.isBase64(subValue)) ||
+            (options.parseBase64byIds && options.parseBase64byIds.includes(subKey))
+          ) {
+            try {
+              subValue = Buffer.from(subValue, "base64").toString("utf8");
+              if (this.isJsonString(subValue)) {
+                subValue = JSONbig.parse(subValue);
+              }
+            } catch (error) {
+              this.adapter.log.warn(`Cannot parse base64 value ${subValue} for ${path + "." + subKey}: ${error}`);
+            }
+          }
+
           const subName = Object.keys(arrayElement)[0] + " " + Object.keys(arrayElement)[1];
           if (key) {
             subKey = key + "." + subKey;
@@ -316,6 +359,14 @@ module.exports = class Json2iob {
       this.adapter.log.error(error);
     }
   }
+  isBase64(str) {
+    if (!str || typeof str !== "string") {
+      return false;
+    }
+    const base64regex = /^([0-9a-zA-Z+/]{4})*(([0-9a-zA-Z+/]{2}==)|([0-9a-zA-Z+/]{3}=))/;
+    return base64regex.test(str);
+  }
+
   isJsonString(str) {
     try {
       JSON.parse(str);
