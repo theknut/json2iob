@@ -10,6 +10,7 @@ descriptions: Object of names for state keys
 states: Object of states to create for an id, new entries via json will be added automatically to the states
 parseBase64: (true false) // parse base64 encoded strings to utf8
 parseBase64byIds: Array of ids to parse base64 encoded strings to utf8
+deleteBeforeUpdate: Delete channel before update,
 */
 const JSONbig = require("json-bigint")({ storeAsString: true });
 module.exports = class Json2iob {
@@ -79,7 +80,15 @@ module.exports = class Json2iob {
 
         return;
       }
-      if (!this.alreadyCreatedObjects[path]) {
+      if (!this.alreadyCreatedObjects[path] ||options.deleteBeforeUpdate) {
+        if (options.deleteBeforeUpdate) {
+          await this.adapter.delObjectAsync(path, { recursive: true });
+          for (const key in this.alreadyCreatedObjects) {
+            if (key.startsWith(path)) {
+              delete this.alreadyCreatedObjects[key];
+            }
+          }
+        }
         let name = options.channelName || "";
         if (options.preferedArrayDesc && element[options.preferedArrayDesc]) {
           name = element[options.preferedArrayDesc];
@@ -97,6 +106,7 @@ module.exports = class Json2iob {
           .then(() => {
             this.alreadyCreatedObjects[path] = true;
             options.channelName = undefined;
+            options.deleteBeforeUpdate = undefined;
           })
           .catch((error) => {
             this.adapter.log.error(error);
