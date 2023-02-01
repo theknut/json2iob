@@ -80,11 +80,14 @@ module.exports = class Json2iob {
 
         return;
       }
-      if (!this.alreadyCreatedObjects[path] ||options.deleteBeforeUpdate) {
+      if (!this.alreadyCreatedObjects[path] || options.deleteBeforeUpdate) {
         if (options.deleteBeforeUpdate) {
+          this.adapter.log.debug(`Deleting ${path} before update`);
           await this.adapter.delObjectAsync(path, { recursive: true });
+        
           for (const key in this.alreadyCreatedObjects) {
             if (key.startsWith(path)) {
+              this.adapter.log.debug(`Deleting ${key} from alreadyCreatedObjects`)
               delete this.alreadyCreatedObjects[key];
             }
           }
