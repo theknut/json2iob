@@ -29,7 +29,13 @@ autoCast (true false) // make JSON.parse to parse numbers correctly
 descriptions: Object of names for state keys
 Object of states to create for an id, new entries via json will be added automatically to the states
 
-deleteBeforeUpdate: Delete before update values
+states: Object of states to create for an id, new entries via json will be added automatically to the states
+
+parseBase64: (true false) // parse base64 encoded strings to utf8
+
+parseBase64byIds: Array of ids to parse base64 encoded strings to utf8
+
+deleteBeforeUpdate: Delete channel before update,
 
 ```javascript
  this.descriptions = {
