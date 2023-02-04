@@ -77,6 +77,9 @@ for (const key in this.json2iob.alreadyCreatedObjects) {
 ### Changelog
 
 2.3.0 Add deleteBeforeUpdate
+
 2.2.0 Add base64 decoding
+
 2.1.0 Add states definition
+
 2.0.2 Add type check before setState and change type to mixed if its differs from creation type to the current value type
