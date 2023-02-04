@@ -29,7 +29,9 @@ autoCast (true false) // make JSON.parse to parse numbers correctly
 descriptions: Object of names for state keys
 Object of states to create for an id, new entries via json will be added automatically to the states
 
-´´´
+deleteBeforeUpdate: Delete before update values
+
+```javascript
  this.descriptions = {
       1: "POWER",
       2: "PLAY_PAUSE",
@@ -52,10 +54,18 @@ Object of states to create for an id, new entries via json will be added automat
       },
     };
 
-    await this.json2iob.parse(path, json, { forceIndex: true, write: true, descriptions: this.descriptions, states: this.states });
+await this.json2iob.parse(path, json, { forceIndex: true, write: true, descriptions: this.descriptions, states: this.states });
+```
 
-´´´
-
+### Force recreation after manual deletion
+```javascript
+await this.delObjectAsync(id + ".clients", { recursive: true });
+          for (const key in this.json2iob.alreadyCreatedObjects) {
+            if (key.startsWith(id + ".clients")) {
+              delete this.json2iob.alreadyCreatedObjects[key];
+            }
+          }
+```
 
 
 ### Changelog
