@@ -66,11 +66,11 @@ await this.json2iob.parse(path, json, { forceIndex: true, write: true, descripti
 ### Force recreation after manual deletion
 ```javascript
 await this.delObjectAsync(id + ".clients", { recursive: true });
-          for (const key in this.json2iob.alreadyCreatedObjects) {
-            if (key.startsWith(id + ".clients")) {
-              delete this.json2iob.alreadyCreatedObjects[key];
-            }
-          }
+for (const key in this.json2iob.alreadyCreatedObjects) {
+  if (key.startsWith(id + ".clients")) {
+    delete this.json2iob.alreadyCreatedObjects[key];
+  }
+}
 ```
 
 
