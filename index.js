@@ -11,6 +11,7 @@ states: Object of states to create for an id, new entries via json will be added
 parseBase64: (true false) // parse base64 encoded strings to utf8
 parseBase64byIds: Array of ids to parse base64 encoded strings to utf8
 deleteBeforeUpdate: Delete channel before update,
+removePasswords: (true false) // remove password from log
 */
 const JSONbig = require("json-bigint")({ storeAsString: true });
 module.exports = class Json2iob {
@@ -80,6 +81,10 @@ module.exports = class Json2iob {
 
         return;
       }
+      if (path.toLowerCase().includes("password") && options.removePasswords) {
+        this.adapter.log.debug(`skip password : ${path}`);
+        return;
+      }
       if (!this.alreadyCreatedObjects[path] || options.deleteBeforeUpdate) {
         if (options.deleteBeforeUpdate) {
           this.adapter.log.debug(`Deleting ${path} before update`);
@@ -119,6 +124,17 @@ module.exports = class Json2iob {
       }
 
       for (const key of objectKeys) {
+        if (key.toLowerCase().includes("password") && options.removePasswords) {
+          this.adapter.log.debug(`skip password : ${path}.${key}`);
+          return;
+        }
+        if (typeof element[key] === "function") {
+          this.adapter.log.debug("Skip function: " + path + "." + key);
+          continue;
+        }
+        if (element[key] == null) {
+          element[key] = "";
+        }
         if (this.isJsonString(element[key]) && options.autoCast) {
           element[key] = JSONbig.parse(element[key]);
         }
