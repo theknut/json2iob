@@ -81,7 +81,7 @@ module.exports = class Json2iob {
 
         return;
       }
-      if (path.toLowerCase().includes("password") && options.removePasswords) {
+      if (options.removePasswords && path.toString().toLowerCase().includes("password")) {
         this.adapter.log.debug(`skip password : ${path}`);
         return;
       }
@@ -287,7 +287,7 @@ module.exports = class Json2iob {
         if (options.preferedArrayName && options.preferedArrayName.indexOf("+") !== -1) {
           const preferedArrayNameArray = options.preferedArrayName.split("+");
           if (arrayElement[preferedArrayNameArray[0]]) {
-            const element0 = arrayElement[preferedArrayNameArray[0]].replace(/\./g, "").replace(/ /g, "");
+            const element0 = arrayElement[preferedArrayNameArray[0]].toString().replace(/\./g, "").replace(/ /g, "");
             let element1 = "";
             if (preferedArrayNameArray[1].indexOf("/") !== -1) {
               const subArray = preferedArrayNameArray[1].split("/");
@@ -298,7 +298,7 @@ module.exports = class Json2iob {
                 element1 = arrayElement[subArray[1]];
               }
             } else {
-              element1 = arrayElement[preferedArrayNameArray[1]].replace(/\./g, "").replace(/ /g, "");
+              element1 = arrayElement[preferedArrayNameArray[1]].toString().replace(/\./g, "").replace(/ /g, "");
             }
             arrayPath = element0 + "-" + element1;
           }
@@ -306,7 +306,7 @@ module.exports = class Json2iob {
           const preferedArrayNameArray = options.preferedArrayName.split("/");
           const subElement = arrayElement[preferedArrayNameArray[0]];
           if (subElement) {
-            arrayPath = subElement[preferedArrayNameArray[1]].replace(/\./g, "").replace(/ /g, "");
+            arrayPath = subElement[preferedArrayNameArray[1]].toString().replace(/\./g, "").replace(/ /g, "");
           }
         } else if (options.preferedArrayName && arrayElement[options.preferedArrayName]) {
           arrayPath = arrayElement[options.preferedArrayName].toString().replace(/\./g, "");
