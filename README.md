@@ -76,7 +76,7 @@ for (const key in this.json2iob.alreadyCreatedObjects) {
 
 ### Changelog
 
-2.4.1 Fix numeric id
+2.4.2 Fix for numeric id
 
 2.4.0 Add deletePasswords, fix functions and null values
 
