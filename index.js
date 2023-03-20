@@ -286,7 +286,7 @@ module.exports = class Json2iob {
 
         if (options.preferedArrayName && options.preferedArrayName.indexOf("+") !== -1) {
           const preferedArrayNameArray = options.preferedArrayName.split("+");
-          if (arrayElement[preferedArrayNameArray[0]]) {
+          if (arrayElement[preferedArrayNameArray[0]] !== undefined) {
             const element0 = arrayElement[preferedArrayNameArray[0]].toString().replace(/\./g, "").replace(/ /g, "");
             let element1 = "";
             if (preferedArrayNameArray[1].indexOf("/") !== -1) {
