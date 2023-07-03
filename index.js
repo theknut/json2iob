@@ -21,7 +21,7 @@ module.exports = class Json2iob {
     this.objectTypes = {};
   }
 
-  async parse(path, element, options) {
+  async parse(path, element, options = {}) {
     try {
       if (element === null || element === undefined) {
         this.adapter.log.debug("Cannot extract empty: " + path);
@@ -52,6 +52,10 @@ module.exports = class Json2iob {
       }
 
       if (typeof element === "string" || typeof element === "number") {
+        //remove ending . from path
+        if (path.endsWith(".")) {
+          path = path.slice(0, -1);
+        }
         const lastPathElement = path.split(".").pop();
 
         if (!this.alreadyCreatedObjects[path] || this.objectTypes[path] !== typeof element) {
