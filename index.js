@@ -12,6 +12,8 @@ parseBase64: (true false) // parse base64 encoded strings to utf8
 parseBase64byIds: Array of ids to parse base64 encoded strings to utf8
 deleteBeforeUpdate: Delete channel before update,
 removePasswords: (true false) // remove password from log
+dontSaveCreatedObjects: (true false) // create objects but do not save them to alreadyCreatedObjects
+excludeStateWithEnding: Array of strings to exclude states with this ending
 */
 const JSONbig = require("json-bigint")({ storeAsString: true });
 module.exports = class Json2iob {
@@ -57,6 +59,14 @@ module.exports = class Json2iob {
           path = path.slice(0, -1);
         }
         const lastPathElement = path.split(".").pop();
+        if (options.excludeStateWithEnding) {
+          for (const excludeEnding of options.excludeStateWithEnding) {
+            if (lastPathElement.endsWith(excludeEnding)) {
+              this.adapter.log.debug(`skip state with ending : ${path}`);
+              return;
+            }
+          }
+        }
 
         if (!this.alreadyCreatedObjects[path] || this.objectTypes[path] !== typeof element) {
           let type = element !== null ? typeof element : "mixed";
@@ -79,7 +89,7 @@ module.exports = class Json2iob {
             read: true,
             states: states,
           };
-          await this.createState(path, common);
+          await this.createState(path, common, options);
         }
         await this.adapter.setStateAsync(path, element, true);
 
@@ -90,6 +100,14 @@ module.exports = class Json2iob {
         return;
       }
       if (!this.alreadyCreatedObjects[path] || options.deleteBeforeUpdate) {
+        if (options.excludeStateWithEnding) {
+          for (const excludeEnding of options.excludeStateWithEnding) {
+            if (path.endsWith(excludeEnding)) {
+              this.adapter.log.debug(`skip state with ending : ${path}`);
+              return;
+            }
+          }
+        }
         if (options.deleteBeforeUpdate) {
           this.adapter.log.debug(`Deleting ${path} before update`);
           for (const key in this.alreadyCreatedObjects) {
@@ -114,7 +132,9 @@ module.exports = class Json2iob {
             native: {},
           })
           .then(() => {
-            this.alreadyCreatedObjects[path] = true;
+            if (!options.dontSaveCreatedObjects) {
+              this.alreadyCreatedObjects[path] = true;
+            }
             options.channelName = undefined;
             options.deleteBeforeUpdate = undefined;
           })
@@ -198,7 +218,7 @@ module.exports = class Json2iob {
               states: states,
             };
 
-            await this.createState(path + "." + pathKey, common);
+            await this.createState(path + "." + pathKey, common, options);
           }
           await this.adapter.setStateAsync(path + "." + pathKey, element[key], true);
         }
@@ -208,7 +228,7 @@ module.exports = class Json2iob {
       this.adapter.log.error(error);
     }
   }
-  async createState(path, common) {
+  async createState(path, common, options = {}) {
     await this.adapter
       .extendObjectAsync(path, {
         type: "state",
@@ -216,7 +236,9 @@ module.exports = class Json2iob {
         native: {},
       })
       .then(() => {
-        this.alreadyCreatedObjects[path] = true;
+        if (!options.dontSaveCreatedObjects) {
+          this.alreadyCreatedObjects[path] = true;
+        }
         this.objectTypes[path] = common.type;
       })
       .catch((error) => {
@@ -230,7 +252,7 @@ module.exports = class Json2iob {
         element = element[key];
       }
       for (let index in element) {
-        const arrayElement = element[index];
+        let arrayElement = element[index];
         if (arrayElement == null) {
           this.adapter.log.debug("Cannot extract empty: " + path + "." + key + "." + index);
           continue;
@@ -240,6 +262,14 @@ module.exports = class Json2iob {
         // @ts-ignore
         if (index < 10) {
           index = "0" + index;
+        }
+        if (options.autoCast && typeof arrayElement === "string" && this.isJsonString(arrayElement)) {
+          try {
+            element[index] = JSONbig.parse(arrayElement);
+            arrayElement = element[index];
+          } catch (error) {
+            this.adapter.log.warn(`Cannot parse json value for ${path + "." + key + "." + index}: ${error}`);
+          }
         }
         let arrayPath = key + index;
         if (typeof arrayElement === "string" && key !== "") {
@@ -378,7 +408,7 @@ module.exports = class Json2iob {
               read: true,
               states: states,
             };
-            await this.createState(path + "." + subKey, common);
+            await this.createState(path + "." + subKey, common, options);
           }
           await this.adapter.setStateAsync(path + "." + subKey, subValue, true);
           continue;
