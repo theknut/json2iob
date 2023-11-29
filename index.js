@@ -72,7 +72,7 @@ module.exports = class Json2iob {
           for (const writingEnding of options.makeStateWritableWithEnding) {
             if (lastPathElement.toLowerCase().endsWith(writingEnding)) {
               this.adapter.log.debug(`make state with ending writable : ${path}`);
-              return;
+              options.write = true;
             }
           }
         }
@@ -120,7 +120,7 @@ module.exports = class Json2iob {
           for (const writingEnding of options.makeStateWritableWithEnding) {
             if (path.toLowerCase().endsWith(writingEnding)) {
               this.adapter.log.debug(`make state with ending writable : ${path}`);
-              return;
+              options.write = true;
             }
           }
         }
