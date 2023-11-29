@@ -79,6 +79,10 @@ for (const key in this.json2iob.alreadyCreatedObjects) {
 
 ### Changelog
 
+2.4.10 Add contidiontal writing with makeStateWritableWithEnding
+
+2.4.9 Add time stamp detection
+
 2.4.8 Add autocast to array elements
 
 2.4.7 Add exclude filter

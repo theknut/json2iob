@@ -14,6 +14,7 @@ deleteBeforeUpdate: Delete channel before update,
 removePasswords: (true false) // remove password from log
 dontSaveCreatedObjects: (true false) // create objects but do not save them to alreadyCreatedObjects
 excludeStateWithEnding: Array of strings to exclude states with this ending
+makeStateWritableWithEnding: Array of strings to make states with this ending writable
 */
 const JSONbig = require("json-bigint")({ storeAsString: true });
 module.exports = class Json2iob {
@@ -67,7 +68,14 @@ module.exports = class Json2iob {
             }
           }
         }
-
+        if (options.makeStateWritableWithEnding) {
+          for (const writingEnding of options.makeStateWritableWithEnding) {
+            if (lastPathElement.toLowerCase().endsWith(writingEnding)) {
+              this.adapter.log.debug(`make state with ending writable : ${path}`);
+              return;
+            }
+          }
+        }
         if (!this.alreadyCreatedObjects[path] || this.objectTypes[path] !== typeof element) {
           let type = element !== null ? typeof element : "mixed";
           if (this.objectTypes[path] && this.objectTypes[path] !== typeof element) {
@@ -104,6 +112,14 @@ module.exports = class Json2iob {
           for (const excludeEnding of options.excludeStateWithEnding) {
             if (path.endsWith(excludeEnding)) {
               this.adapter.log.debug(`skip state with ending : ${path}`);
+              return;
+            }
+          }
+        }
+        if (options.makeStateWritableWithEnding) {
+          for (const writingEnding of options.makeStateWritableWithEnding) {
+            if (path.toLowerCase().endsWith(writingEnding)) {
+              this.adapter.log.debug(`make state with ending writable : ${path}`);
               return;
             }
           }
@@ -444,6 +460,11 @@ module.exports = class Json2iob {
       return "switch";
     }
     if (typeof element === "number" && !write) {
+      if (element && element.toString().length === 13) {
+        if (element > 1500000000000 && element < 2000000000000) {
+          return "value.time";
+        }
+      }
       return "value";
     }
     if (typeof element === "number" && write) {
