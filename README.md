@@ -79,7 +79,7 @@ for (const key in this.json2iob.alreadyCreatedObjects) {
 
 ### Changelog
 
-2.5.0 add forbidden charackter replacing
+2.5.1 add forbidden charackter replacing
 
 2.4.11 Add contidiontal writing with makeStateWritableWithEnding
 

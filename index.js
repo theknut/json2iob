@@ -57,7 +57,8 @@ module.exports = class Json2iob {
           options["write"] = false;
         }
       }
-      path = path.replace(this.forbbidenCharsRegex, "_");
+
+      path = path.toString().replace(this.forbbidenCharsRegex, "_");
 
       if (typeof element === "string" || typeof element === "number") {
         //remove ending . from path
