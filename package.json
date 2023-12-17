@@ -1,6 +1,6 @@
 {
   "name": "json2iob",
-  "version": "2.4.11",
+  "version": "2.5.0",
   "description": "Conver Json to ioBroker Objects",
   "author": "TA2k <tombox2020@gmail.com>",
   "contributors": [],

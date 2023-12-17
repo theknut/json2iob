@@ -22,6 +22,10 @@ module.exports = class Json2iob {
     this.adapter = adapter;
     this.alreadyCreatedObjects = {};
     this.objectTypes = {};
+    this.forbbidenCharsRegex = /[^._\-/ :!#$%&()+=@^{}|~\p{Ll}\p{Lu}\p{Nd}]+/gu;
+    if (this.adapter && this.adapter.FORBIDDEN_CHARS) {
+      this.forbbidenCharsRegex = this.adapter.FORBIDDEN_CHARS;
+    }
   }
 
   async parse(path, element, options = {}) {
@@ -53,12 +57,14 @@ module.exports = class Json2iob {
           options["write"] = false;
         }
       }
+      path = path.replace(this.forbbidenCharsRegex, "_");
 
       if (typeof element === "string" || typeof element === "number") {
         //remove ending . from path
         if (path.endsWith(".")) {
           path = path.slice(0, -1);
         }
+
         const lastPathElement = path.split(".").pop();
         if (options.excludeStateWithEnding) {
           for (const excludeEnding of options.excludeStateWithEnding) {
