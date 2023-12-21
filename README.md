@@ -16,7 +16,7 @@ this.json2iob.parse(path, json, { forceIndex: true });
 
 ### Options:
 
-```json
+```
 write //set common write variable to true
 
 forceIndex //instead of trying to find names for array entries, use the index as the name. If a key with id, name, label, labelText the value will use a name. This is overriden by preferedArrayName
