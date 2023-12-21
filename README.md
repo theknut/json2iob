@@ -1,39 +1,52 @@
 # Json2iob
 
-Convert json objects into ioBroker states
+This package converts a json objects into ioBroker states. It can handle nested array and obects. It will also generated automaticly the type and roles based on the type of value.
 
 ## Usage
 
+In a ioBroker Adapter
+
+```
 const Json2iob = require("json2iob");
 
 this.json2iob = new Json2iob(this);
 
 this.json2iob.parse(path, json, { forceIndex: true });
+```
 
 ### Options:
 
+```json
 write //set common write variable to true
 
-forceIndex //instead of trying to find names for array entries, use the index as the name
-
-channelName //set name of the root channel
+forceIndex //instead of trying to find names for array entries, use the index as the name. If a key with id, name, label, labelText the value will use a name. This is overriden by preferedArrayName
 
 preferedArrayName //set key to use this as an array entry name
 
 preferedArrayDec //set key to use this as an array entry description
 
-autoCast (true false) // make JSON.parse to parse numbers correctly
+channelName //set name of the root channel
 
-descriptions: Object of names for state keys
-Object of states to create for an id, new entries via json will be added automatically to the states
+autoCast (true false) // make JSON.parse on all values to parse numbers correctly
 
-states: Object of states to create for an id, new entries via json will be added automatically to the states
+descriptions: //Object of names for state keys
+
+states: // Object of states to create for an id, new entries via json will be added automatically to the states
 
 parseBase64: (true false) // parse base64 encoded strings to utf8
 
-parseBase64byIds: Array of ids to parse base64 encoded strings to utf8
+parseBase64byIds: //Array of ids to parse base64 encoded strings to utf8
 
-deleteBeforeUpdate: Delete channel before update,
+deleteBeforeUpdate: //Delete channel before update,
+
+removePasswords: // remove the values from password keys
+
+dontSaveCreatedObjects: //create objects but do not save them to alreadyCreatedObjects this leads to recreating at every parsing
+
+excludeStateWithEnding: //Array of strings to exclude states with this ending
+
+makeStateWritableWithEnding: //Array of strings to make states with this ending writable
+```
 
 ```javascript
 this.descriptions = {
