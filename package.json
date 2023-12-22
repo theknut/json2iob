@@ -1,7 +1,7 @@
 {
   "name": "json2iob",
   "version": "2.5.2",
-  "description": "Conver Json to ioBroker Objects",
+  "description": "Convert Json to ioBroker States",
   "author": "TA2k <tombox2020@gmail.com>",
   "contributors": [],
   "homepage": "",
@@ -11,6 +11,9 @@
     "adapter",
     "json"
   ],
+  "scripts": {
+    "build": "tsc"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/TA2k/json2iob"
@@ -19,10 +22,16 @@
     "json-bigint": "^1.0.0"
   },
   "devDependencies": {
-    "@tsconfig/node14": "^14.1.0"
+    "@tsconfig/node14": "^14.1.0",
+    "@types/json-bigint": "^1.0.4",
+    "@types/node": "^20.10.5",
+    "typescript": "^5.3.3"
   },
   "bugs": {
     "url": "https://github.com/TA2k/json2iob/issues"
   },
-  "main": "index.js"
+  "main": "./dist/index.js",
+  "engines": {
+    "node": ">=16"
+  }
 }

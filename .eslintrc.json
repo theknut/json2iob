@@ -1,9 +1,9 @@
 {
     "root": true,
     "env": {
-        "es6": true,
         "node": true,
-        "mocha": true
+        "mocha": true,
+        "es2022": true
     },
     "extends": ["eslint:recommended"],
     "plugins": [],
@@ -37,6 +37,6 @@
         "semi": ["error", "always"]
     },
     "parserOptions": {
-        "ecmaVersion": 2020
+        "ecmaVersion": 2022
     }
 }

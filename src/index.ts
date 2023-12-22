@@ -1,18 +1,36 @@
-const JSONbig = require("json-bigint")({ storeAsString: true });
+import JSONbig from "json-bigint";
 
-module.exports = class Json2iob {
-  /**
-   * Constructs a new instance of the class.
-   * @class Json2iob
-   * @param {Object} adapter - The ioBroker adapter object.
-   */
-  constructor(adapter) {
+type Options = {
+  write?: boolean;
+  forceIndex?: boolean;
+  channelName?: string;
+  preferedArrayName?: string;
+  preferedArrayDesc?: string;
+  autoCast?: boolean;
+  descriptions?: any;
+  states?: any;
+  parseBase64?: boolean;
+  parseBase64byIds?: string[];
+  deleteBeforeUpdate?: boolean;
+  removePasswords?: boolean;
+  excludeStateWithEnding?: string[];
+  makeStateWritableWithEnding?: string[];
+  dontSaveCreatedObjects?: boolean;
+};
+
+export default class Json2iob {
+  private adapter: any;
+  private alreadyCreatedObjects: any;
+  private objectTypes: any;
+  private forbiddenCharsRegex: RegExp;
+
+  constructor(adapter: any) {
     this.adapter = adapter;
     this.alreadyCreatedObjects = {};
     this.objectTypes = {};
-    this.forbbidenCharsRegex = /[^._\-/ :!#$%&()+=@^{}|~\p{Ll}\p{Lu}\p{Nd}]+/gu;
+    this.forbiddenCharsRegex = /[^._\-/ :!#$%&()+=@^{}|~\p{Ll}\p{Lu}\p{Nd}]+/gu;
     if (this.adapter && this.adapter.FORBIDDEN_CHARS) {
-      this.forbbidenCharsRegex = this.adapter.FORBIDDEN_CHARS;
+      this.forbiddenCharsRegex = this.adapter.FORBIDDEN_CHARS;
     }
   }
 
@@ -39,7 +57,8 @@ module.exports = class Json2iob {
    * @param {boolean} [options.dontSaveCreatedObjects] - Create objects but do not save them to alreadyCreatedObjects.
    * @returns {Promise<void>} - A promise that resolves when the parsing is complete.
    */
-  async parse(path, element, options = {}) {
+
+  async parse(path: string, element: any, options: Options = { write: false }): Promise<void> {
     try {
       if (element === null || element === undefined) {
         this.adapter.log.debug("Cannot extract empty: " + path);
@@ -69,7 +88,7 @@ module.exports = class Json2iob {
         }
       }
 
-      path = path.toString().replace(this.forbbidenCharsRegex, "_");
+      path = path.toString().replace(this.forbiddenCharsRegex, "_");
 
       if (typeof element === "string" || typeof element === "number") {
         //remove ending . from path
@@ -172,7 +191,7 @@ module.exports = class Json2iob {
             options.channelName = undefined;
             options.deleteBeforeUpdate = undefined;
           })
-          .catch((error) => {
+          .catch((error: any) => {
             this.adapter.log.error(error);
           });
       }
@@ -270,7 +289,7 @@ module.exports = class Json2iob {
    * @param {boolean} [options.dontSaveCreatedObjects] - If true, the created object will not be saved.
    * @returns {Promise<void>} - A promise that resolves when the state object is created.
    */
-  async _createState(path, common, options = {}) {
+  async _createState(path: string, common: any, options: Options = {}) {
     await this.adapter
       .extendObjectAsync(path, {
         type: "state",
@@ -283,7 +302,7 @@ module.exports = class Json2iob {
         }
         this.objectTypes[path] = common.type;
       })
-      .catch((error) => {
+      .catch((error: any) => {
         this.adapter.log.error(error);
       });
   }
@@ -297,7 +316,7 @@ module.exports = class Json2iob {
    * @param {object} options - The parsing options.
    * @returns {Promise<void>} - A promise that resolves when the array extraction and parsing is complete.
    */
-  async _extractArray(element, key, path, options) {
+  async _extractArray(element: any, key: string, path: string, options: Options) {
     try {
       if (key) {
         element = element[key];
@@ -453,7 +472,7 @@ module.exports = class Json2iob {
             }
             const common = {
               name: subName,
-              role: this._getRole(subValue, options.write),
+              role: this._getRole(subValue, options.write || false),
               type: type,
               write: options.write,
               read: true,
@@ -477,7 +496,7 @@ module.exports = class Json2iob {
    * @param {string} str - The string to be checked.
    * @returns {boolean} - Returns true if the string is a valid base64 encoded string, otherwise returns false.
    */
-  _isBase64(str) {
+  _isBase64(str: string) {
     if (!str || typeof str !== "string") {
       return false;
     }
@@ -490,7 +509,7 @@ module.exports = class Json2iob {
    * @param {string} str - The string to be checked.
    * @returns {boolean} - Returns true if the string is a valid JSON string, otherwise false.
    */
-  _isJsonString(str) {
+  _isJsonString(str: string) {
     try {
       JSON.parse(str);
     } catch (e) {
@@ -504,7 +523,7 @@ module.exports = class Json2iob {
    * @param {boolean} write - Indicates whether the element is being written to.
    * @returns {string} - The role of the element.
    */
-  _getRole(element, write) {
+  _getRole(element: any, write: boolean) {
     if (typeof element === "boolean" && !write) {
       return "indicator";
     }
@@ -527,4 +546,4 @@ module.exports = class Json2iob {
     }
     return "state";
   }
-};
+}
