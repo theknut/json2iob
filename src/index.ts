@@ -1,10 +1,10 @@
 import JSONbig from "json-bigint";
 
 type Options = {
-  write?: boolean;
-  forceIndex?: boolean;
-  channelName?: string;
-  preferedArrayName?: string;
+  write?: boolean; // Activate write for all states.
+  forceIndex?: boolean; // Instead of trying to find names for array entries, use the index as the name.
+  channelName?: string; // Set name of the root channel.
+  preferedArrayName?: string; // Set key to use this as an array entry name.
   preferedArrayDesc?: string;
   autoCast?: boolean;
   descriptions?: any;
