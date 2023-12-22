@@ -1,23 +1,11 @@
-/*
-options:
-write //set common write variable to true
-forceIndex //instead of trying to find names for array entries, use the index as the name
-channelName //set name of the root channel
-preferedArrayName //set key to use this as an array entry name
-preferedArrayDec //set key to use this as an array entry description
-autoCast (true false) // make JSON.parse to parse numbers correctly
-descriptions: Object of names for state keys
-states: Object of states to create for an id, new entries via json will be added automatically to the states
-parseBase64: (true false) // parse base64 encoded strings to utf8
-parseBase64byIds: Array of ids to parse base64 encoded strings to utf8
-deleteBeforeUpdate: Delete channel before update,
-removePasswords: (true false) // remove password from log
-dontSaveCreatedObjects: (true false) // create objects but do not save them to alreadyCreatedObjects
-excludeStateWithEnding: Array of strings to exclude states with this ending
-makeStateWritableWithEnding: Array of strings to make states with this ending writable
-*/
 const JSONbig = require("json-bigint")({ storeAsString: true });
+
 module.exports = class Json2iob {
+  /**
+   * Constructs a new instance of the class.
+   * @class Json2iob
+   * @param {Object} adapter - The ioBroker adapter object.
+   */
   constructor(adapter) {
     this.adapter = adapter;
     this.alreadyCreatedObjects = {};
@@ -30,47 +18,28 @@ module.exports = class Json2iob {
 
   /**
    * Parses the given element and creates states in the adapter based on the element's structure.
+   * @method parse
    * @param {string} path - The ioBroker path of the element.
    * @param {any} element - The element to be parsed.
    * @param {Object} [options={}] - The parsing options.
-   * @param options.write Activate write for all states
-   * @param options.forceIndex Instead of trying to find names for array entries, use the index as the name
-   * @param options.channelName Set name of the root channel
-   * @param options.preferedArrayName Set key to use this as an array entry name
-   * @param options.preferedArrayDec Set key to use this as an array entry description
-   * @param options.autoCast (true false) Make JSON.parse to parse numbers correctly
-   * @param options.descriptions Object of names for state keys
-   * @param options.states Object of states to create for an id, new entries via json will be added automatically to the states
-   * @param options.parseBase64 (true false) Parse base64 encoded strings to utf8
-   * @param options.parseBase64byIds Array of ids to parse base64 encoded strings to utf8
-   * @param options.deleteBeforeUpdate Delete channel before update,
-   * @param options.removePasswords (true false) Remove password from log
-   * @param options.excludeStateWithEnding Array of strings to exclude states with this ending
-   * @param options.makeStateWritableWithEnding Array of strings to make states with this ending writable
-   * @param options.dontSaveCreatedObjects (true false) Create objects but do not save them to alreadyCreatedObjects
+   * @param {boolean} [options.write] - Activate write for all states.
+   * @param {boolean} [options.forceIndex] - Instead of trying to find names for array entries, use the index as the name.
+   * @param {string} [options.channelName] - Set name of the root channel.
+   * @param {string} [options.preferedArrayName] - Set key to use this as an array entry name.
+   * @param {string} [options.preferedArrayDesc] - Set key to use this as an array entry description.
+   * @param {boolean} [options.autoCast] - Make JSON.parse to parse numbers correctly.
+   * @param {Object} [options.descriptions] - Object of names for state keys.
+   * @param {Object} [options.states] - Object of states to create for an id, new entries via json will be added automatically to the states.
+   * @param {boolean} [options.parseBase64] - Parse base64 encoded strings to utf8.
+   * @param {string[]} [options.parseBase64byIds] - Array of ids to parse base64 encoded strings to utf8.
+   * @param {boolean} [options.deleteBeforeUpdate] - Delete channel before update.
+   * @param {boolean} [options.removePasswords] - Remove password from log.
+   * @param {string[]} [options.excludeStateWithEnding] - Array of strings to exclude states with this ending.
+   * @param {string[]} [options.makeStateWritableWithEnding] - Array of strings to make states with this ending writable.
+   * @param {boolean} [options.dontSaveCreatedObjects] - Create objects but do not save them to alreadyCreatedObjects.
    * @returns {Promise<void>} - A promise that resolves when the parsing is complete.
    */
-  async parse(
-    path,
-    element,
-    options = {
-      write: Boolean,
-      forceIndex: Boolean,
-      channelName: String,
-      preferedArrayName: String,
-      preferedArrayDec: String,
-      autoCast: Boolean,
-      descriptions: String,
-      states: Object,
-      parseBase64: Boolean,
-      parseBase64byIds: Array,
-      deleteBeforeUpdate: Boolean,
-      removePasswords: Boolean,
-      excludeStateWithEnding: Array,
-      makeStateWritableWithEnding: Array,
-      dontSaveCreatedObjects: Boolean,
-    },
-  ) {
+  async parse(path, element, options = {}) {
     try {
       if (element === null || element === undefined) {
         this.adapter.log.debug("Cannot extract empty: " + path);
@@ -78,12 +47,12 @@ module.exports = class Json2iob {
       }
 
       if (
-        (options.parseBase64 && this.isBase64(element)) ||
+        (options.parseBase64 && this._isBase64(element)) ||
         (options.parseBase64byIds && options.parseBase64byIds.includes(path))
       ) {
         try {
           element = Buffer.from(element, "base64").toString("utf8");
-          if (this.isJsonString(element)) {
+          if (this._isJsonString(element)) {
             element = JSONbig.parse(element);
           }
         } catch (error) {
@@ -109,7 +78,7 @@ module.exports = class Json2iob {
         }
 
         const lastPathElement = path.split(".").pop();
-        if (options.excludeStateWithEnding) {
+        if (options.excludeStateWithEnding && lastPathElement) {
           for (const excludeEnding of options.excludeStateWithEnding) {
             if (lastPathElement.endsWith(excludeEnding)) {
               this.adapter.log.debug(`skip state with ending : ${path}`);
@@ -117,7 +86,7 @@ module.exports = class Json2iob {
             }
           }
         }
-        if (options.makeStateWritableWithEnding) {
+        if (options.makeStateWritableWithEnding && lastPathElement) {
           for (const writingEnding of options.makeStateWritableWithEnding) {
             if (lastPathElement.toLowerCase().endsWith(writingEnding)) {
               this.adapter.log.debug(`make state with ending writable : ${path}`);
@@ -140,13 +109,13 @@ module.exports = class Json2iob {
           }
           const common = {
             name: lastPathElement,
-            role: this.getRole(element, options.write),
+            role: this._getRole(element, options.write || false),
             type: type,
             write: options.write,
             read: true,
             states: states,
           };
-          await this.createState(path, common, options);
+          await this._createState(path, common, options);
         }
         await this.adapter.setStateAsync(path, element, true);
 
@@ -208,7 +177,7 @@ module.exports = class Json2iob {
           });
       }
       if (Array.isArray(element)) {
-        await this.extractArray(element, "", path, options);
+        await this._extractArray(element, "", path, options);
         return;
       }
 
@@ -224,17 +193,17 @@ module.exports = class Json2iob {
         if (element[key] == null) {
           element[key] = "";
         }
-        if (this.isJsonString(element[key]) && options.autoCast) {
+        if (this._isJsonString(element[key]) && options.autoCast) {
           element[key] = JSONbig.parse(element[key]);
         }
 
         if (
-          (options.parseBase64 && this.isBase64(element[key])) ||
+          (options.parseBase64 && this._isBase64(element[key])) ||
           (options.parseBase64byIds && options.parseBase64byIds.includes(key))
         ) {
           try {
             element[key] = Buffer.from(element[key], "base64").toString("utf8");
-            if (this.isJsonString(element[key])) {
+            if (this._isJsonString(element[key])) {
               element[key] = JSONbig.parse(element[key]);
             }
           } catch (error) {
@@ -243,7 +212,7 @@ module.exports = class Json2iob {
         }
 
         if (Array.isArray(element[key])) {
-          await this.extractArray(element, key, path, options);
+          await this._extractArray(element, key, path, options);
         } else if (element[key] !== null && typeof element[key] === "object") {
           await this.parse(path + "." + key, element[key], options);
         } else {
@@ -276,14 +245,14 @@ module.exports = class Json2iob {
 
             const common = {
               name: objectName,
-              role: this.getRole(element[key], options.write),
+              role: this._getRole(element[key], options.write || false),
               type: type,
               write: options.write,
               read: true,
               states: states,
             };
 
-            await this.createState(path + "." + pathKey, common, options);
+            await this._createState(path + "." + pathKey, common, options);
           }
           await this.adapter.setStateAsync(path + "." + pathKey, element[key], true);
         }
@@ -293,7 +262,15 @@ module.exports = class Json2iob {
       this.adapter.log.error(error);
     }
   }
-  async createState(path, common, options = {}) {
+  /**
+   * Creates a state object in the adapter's namespace.
+   * @param {string} path - The path of the state object.
+   * @param {object} common - The common object for the state.
+   * @param {object} [options] - Optional parameters.
+   * @param {boolean} [options.dontSaveCreatedObjects] - If true, the created object will not be saved.
+   * @returns {Promise<void>} - A promise that resolves when the state object is created.
+   */
+  async _createState(path, common, options = {}) {
     await this.adapter
       .extendObjectAsync(path, {
         type: "state",
@@ -311,7 +288,16 @@ module.exports = class Json2iob {
       });
   }
 
-  async extractArray(element, key, path, options) {
+  /**
+   * Extracts an array from the given element and recursively parses its elements.
+   *
+   * @param {object} element - The element containing the array.
+   * @param {string} key - The key of the array in the element.
+   * @param {string} path - The current path in the object hierarchy.
+   * @param {object} options - The parsing options.
+   * @returns {Promise<void>} - A promise that resolves when the array extraction and parsing is complete.
+   */
+  async _extractArray(element, key, path, options) {
     try {
       if (key) {
         element = element[key];
@@ -328,7 +314,7 @@ module.exports = class Json2iob {
         if (index < 10) {
           index = "0" + index;
         }
-        if (options.autoCast && typeof arrayElement === "string" && this.isJsonString(arrayElement)) {
+        if (options.autoCast && typeof arrayElement === "string" && this._isJsonString(arrayElement)) {
           try {
             element[index] = JSONbig.parse(arrayElement);
             arrayElement = element[index];
@@ -428,12 +414,12 @@ module.exports = class Json2iob {
           let subValue = arrayElement[Object.keys(arrayElement)[1]];
 
           if (
-            (options.parseBase64 && this.isBase64(subValue)) ||
+            (options.parseBase64 && this._isBase64(subValue)) ||
             (options.parseBase64byIds && options.parseBase64byIds.includes(subKey))
           ) {
             try {
               subValue = Buffer.from(subValue, "base64").toString("utf8");
-              if (this.isJsonString(subValue)) {
+              if (this._isJsonString(subValue)) {
                 subValue = JSONbig.parse(subValue);
               }
             } catch (error) {
@@ -467,13 +453,13 @@ module.exports = class Json2iob {
             }
             const common = {
               name: subName,
-              role: this.getRole(subValue, options.write),
+              role: this._getRole(subValue, options.write),
               type: type,
               write: options.write,
               read: true,
               states: states,
             };
-            await this.createState(path + "." + subKey, common, options);
+            await this._createState(path + "." + subKey, common, options);
           }
           await this.adapter.setStateAsync(path + "." + subKey, subValue, true);
           continue;
@@ -485,7 +471,13 @@ module.exports = class Json2iob {
       this.adapter.log.error(error);
     }
   }
-  isBase64(str) {
+  /**
+   * Checks if a string is a valid base64 encoded string.
+   *
+   * @param {string} str - The string to be checked.
+   * @returns {boolean} - Returns true if the string is a valid base64 encoded string, otherwise returns false.
+   */
+  _isBase64(str) {
     if (!str || typeof str !== "string") {
       return false;
     }
@@ -493,7 +485,12 @@ module.exports = class Json2iob {
     return base64regex.test(str);
   }
 
-  isJsonString(str) {
+  /**
+   * Checks if a given string is a valid JSON string.
+   * @param {string} str - The string to be checked.
+   * @returns {boolean} - Returns true if the string is a valid JSON string, otherwise false.
+   */
+  _isJsonString(str) {
     try {
       JSON.parse(str);
     } catch (e) {
@@ -501,7 +498,13 @@ module.exports = class Json2iob {
     }
     return true;
   }
-  getRole(element, write) {
+  /**
+   * Determines the role of an element based on its type and write mode.
+   * @param {any} element - The element to determine the role for.
+   * @param {boolean} write - Indicates whether the element is being written to.
+   * @returns {string} - The role of the element.
+   */
+  _getRole(element, write) {
     if (typeof element === "boolean" && !write) {
       return "indicator";
     }
