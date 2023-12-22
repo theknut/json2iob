@@ -40,9 +40,9 @@ class Json2iob {
   /**
    * Parses the given element and creates states in the adapter based on the element's structure.
    * @method parse
-   * @param {string} path - The ioBroker path of the element.
+   * @param {string} path - The ioBroker object path which the element should be saved to.
    * @param {any} element - The element to be parsed.
-   * @param {Object} [options={}] - The parsing options.
+   * @param {Options} [options={}] - The parsing options.
    * @param {boolean} [options.write] - Activate write for all states.
    * @param {boolean} [options.forceIndex] - Instead of trying to find names for array entries, use the index as the name.
    * @param {string} [options.channelName] - Set name of the root channel.
