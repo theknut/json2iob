@@ -18,13 +18,16 @@ type Options = {
   dontSaveCreatedObjects?: boolean;
 };
 
-export default class Json2iob {
+class Json2iob {
   private adapter: any;
   private alreadyCreatedObjects: any;
   private objectTypes: any;
   private forbiddenCharsRegex: RegExp;
 
   constructor(adapter: any) {
+    if (!adapter) {
+      throw new Error("ioBroker Adapter is not defined!");
+    }
     this.adapter = adapter;
     this.alreadyCreatedObjects = {};
     this.objectTypes = {};
@@ -547,3 +550,4 @@ export default class Json2iob {
     return "state";
   }
 }
+export = Json2iob;
