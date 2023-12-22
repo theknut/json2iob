@@ -20,11 +20,11 @@
     "url": "https://github.com/TA2k/json2iob"
   },
   "dependencies": {
+    "@types/json-bigint": "^1.0.4",
     "json-bigint": "^1.0.0"
   },
   "devDependencies": {
     "@tsconfig/node14": "^14.1.0",
-    "@types/json-bigint": "^1.0.4",
     "@types/node": "^20.10.5",
     "typescript": "^5.3.3"
   },
