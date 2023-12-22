@@ -28,7 +28,49 @@ module.exports = class Json2iob {
     }
   }
 
-  async parse(path, element, options = {}) {
+  /**
+   * Parses the given element and creates states in the adapter based on the element's structure.
+   * @param {string} path - The ioBroker path of the element.
+   * @param {any} element - The element to be parsed.
+   * @param {Object} [options={}] - The parsing options.
+   * @param options.write Activate write for all states
+   * @param options.forceIndex Instead of trying to find names for array entries, use the index as the name
+   * @param options.channelName Set name of the root channel
+   * @param options.preferedArrayName Set key to use this as an array entry name
+   * @param options.preferedArrayDec Set key to use this as an array entry description
+   * @param options.autoCast (true false) Make JSON.parse to parse numbers correctly
+   * @param options.descriptions Object of names for state keys
+   * @param options.states Object of states to create for an id, new entries via json will be added automatically to the states
+   * @param options.parseBase64 (true false) Parse base64 encoded strings to utf8
+   * @param options.parseBase64byIds Array of ids to parse base64 encoded strings to utf8
+   * @param options.deleteBeforeUpdate Delete channel before update,
+   * @param options.removePasswords (true false) Remove password from log
+   * @param options.excludeStateWithEnding Array of strings to exclude states with this ending
+   * @param options.makeStateWritableWithEnding Array of strings to make states with this ending writable
+   * @param options.dontSaveCreatedObjects (true false) Create objects but do not save them to alreadyCreatedObjects
+   * @returns {Promise<void>} - A promise that resolves when the parsing is complete.
+   */
+  async parse(
+    path,
+    element,
+    options = {
+      write: Boolean,
+      forceIndex: Boolean,
+      channelName: String,
+      preferedArrayName: String,
+      preferedArrayDec: String,
+      autoCast: Boolean,
+      descriptions: String,
+      states: Object,
+      parseBase64: Boolean,
+      parseBase64byIds: Array,
+      deleteBeforeUpdate: Boolean,
+      removePasswords: Boolean,
+      excludeStateWithEnding: Array,
+      makeStateWritableWithEnding: Array,
+      dontSaveCreatedObjects: Boolean,
+    },
+  ) {
     try {
       if (element === null || element === undefined) {
         this.adapter.log.debug("Cannot extract empty: " + path);
