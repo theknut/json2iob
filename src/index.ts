@@ -9,6 +9,7 @@ type Options = {
   autoCast?: boolean;
   descriptions?: any;
   states?: any;
+  units?: any;
   parseBase64?: boolean;
   parseBase64byIds?: string[];
   deleteBeforeUpdate?: boolean;
@@ -16,6 +17,15 @@ type Options = {
   excludeStateWithEnding?: string[];
   makeStateWritableWithEnding?: string[];
   dontSaveCreatedObjects?: boolean;
+};
+type iobCommon = {
+  name?: string;
+  role: string;
+  type: string;
+  write: boolean | undefined;
+  read: boolean;
+  states?: any;
+  unit?: string;
 };
 
 class Json2iob {
@@ -51,6 +61,7 @@ class Json2iob {
    * @param {boolean} [options.autoCast] - Make JSON.parse to parse numbers correctly.
    * @param {Object} [options.descriptions] - Object of names for state keys.
    * @param {Object} [options.states] - Object of states to create for an id, new entries via json will be added automatically to the states.
+   * @param {Object} [options.units] - Object of untis to create for an id
    * @param {boolean} [options.parseBase64] - Parse base64 encoded strings to utf8.
    * @param {string[]} [options.parseBase64byIds] - Array of ids to parse base64 encoded strings to utf8.
    * @param {boolean} [options.deleteBeforeUpdate] - Delete channel before update.
@@ -129,7 +140,8 @@ class Json2iob {
               states[element] = element;
             }
           }
-          const common = {
+
+          const common: iobCommon = {
             name: lastPathElement,
             role: this._getRole(element, options.write || false),
             type: type,
@@ -137,6 +149,9 @@ class Json2iob {
             read: true,
             states: states,
           };
+          if (options.units && options.units[path]) {
+            common.unit = options.units[path];
+          }
           await this._createState(path, common, options);
         }
         await this.adapter.setStateAsync(path, element, true);
@@ -265,7 +280,7 @@ class Json2iob {
               }
             }
 
-            const common = {
+            const common: iobCommon = {
               name: objectName,
               role: this._getRole(element[key], options.write || false),
               type: type,
@@ -274,6 +289,9 @@ class Json2iob {
               states: states,
             };
 
+            if (options.units && options.units[key]) {
+              common.unit = options.units[key]; // Assign the value to the 'unit' property
+            }
             await this._createState(path + "." + pathKey, common, options);
           }
           await this.adapter.setStateAsync(path + "." + pathKey, element[key], true);
@@ -473,7 +491,7 @@ class Json2iob {
                 states[subValue] = subValue;
               }
             }
-            const common = {
+            const common: iobCommon = {
               name: subName,
               role: this._getRole(subValue, options.write || false),
               type: type,
@@ -481,6 +499,9 @@ class Json2iob {
               read: true,
               states: states,
             };
+            if (options.units && options.units[subKey]) {
+              common.unit = options.units[subKey];
+            }
             await this._createState(path + "." + subKey, common, options);
           }
           await this.adapter.setStateAsync(path + "." + subKey, subValue, true);

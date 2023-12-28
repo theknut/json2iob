@@ -33,6 +33,8 @@ descriptions: //Object of names for state keys
 
 states: // Object of states to create for an id, new entries via json will be added automatically to the states
 
+units: // Object of units to create for an id.
+
 parseBase64: (true false) // parse base64 encoded strings to utf8
 
 parseBase64byIds: //Array of ids to parse base64 encoded strings to utf8
@@ -91,6 +93,8 @@ for (const key in this.json2iob.alreadyCreatedObjects) {
 ```
 
 ### Changelog
+
+2.6.0 convert to TypeScript and add unit option
 
 2.5.2 add forbidden charackter replacing
 
