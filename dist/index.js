@@ -402,7 +402,7 @@ class Json2iob {
                     if (options.zeroBasedArrayIndex === true) {
                         indexNumber -= 1;
                     }
-                    index = `${options.padArrayIndex === true && indexNumber < 10 ? "0" : ""}${indexNumber}`;
+                    index = `${(options.padArrayIndex === true || options.padArrayIndex === undefined) && indexNumber < 10 ? "0" : ""}${indexNumber}`;
                     arrayPath = key + index;
                 }
                 //special case array with 2 string objects
