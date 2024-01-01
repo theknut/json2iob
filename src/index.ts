@@ -444,10 +444,16 @@ class Json2iob {
 
         if (options.forceIndex) {
           if (options.zeroBasedArrayIndex === true) {
-              indexNumber -= 1;
+            indexNumber -= 1;
           }
 
-          index = `${options.disablePadIndex === false && indexNumber < 10 ? "0" : ""}${indexNumber}`;
+          if (options.disablePadIndex) {
+            index = indexNumber.toString();
+          } else if (indexNumber < 10) {
+            // reassign index in case zeroBasedarrayIndex is enabled
+            index = `0${indexNumber}`;
+          }
+
           arrayPath = key + index;
         }
         //special case array with 2 string objects
