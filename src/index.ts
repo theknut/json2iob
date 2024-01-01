@@ -314,7 +314,7 @@ class Json2iob {
    * @param {boolean} [options.dontSaveCreatedObjects] - If true, the created object will not be saved.
    * @returns {Promise<void>} - A promise that resolves when the state object is created.
    */
-  async _createState(path: string, common: any, options: Options = {}) {
+  async _createState(path: string, common: any, options: Options = {}): Promise<void> {
     await this.adapter
       .extendObjectAsync(path, {
         type: "state",
@@ -341,7 +341,7 @@ class Json2iob {
    * @param {object} options - The parsing options.
    * @returns {Promise<void>} - A promise that resolves when the array extraction and parsing is complete.
    */
-  async _extractArray(element: any, key: string, path: string, options: Options) {
+  async _extractArray(element: any, key: string, path: string, options: Options): Promise<void> {
     try {
       if (key) {
         element = element[key];
@@ -530,7 +530,7 @@ class Json2iob {
    * @param {string} str - The string to be checked.
    * @returns {boolean} - Returns true if the string is a valid base64 encoded string, otherwise returns false.
    */
-  _isBase64(str: string) {
+  _isBase64(str: string): boolean {
     if (!str || typeof str !== "string") {
       return false;
     }
@@ -543,7 +543,7 @@ class Json2iob {
    * @param {string} str - The string to be checked.
    * @returns {boolean} - Returns true if the string is a valid JSON string, otherwise false.
    */
-  _isJsonString(str: string) {
+  _isJsonString(str: string): boolean {
     try {
       JSON.parse(str);
     } catch (e) {
@@ -557,7 +557,7 @@ class Json2iob {
    * @param {boolean} write - Indicates whether the element is being written to.
    * @returns {string} - The role of the element.
    */
-  _getRole(element: any, write: boolean) {
+  _getRole(element: any, write: boolean): "indicator" | "switch" | "value.time" | "value" | "level" | "text" | "state" {
     if (typeof element === "boolean" && !write) {
       return "indicator";
     }
