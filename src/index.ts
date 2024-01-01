@@ -3,8 +3,8 @@ import JSONbig from "json-bigint";
 type Options = {
   write?: boolean; // Activate write for all states.
   forceIndex?: boolean; // Instead of trying to find names for array entries, use the index as the name.
-  padArrayIndex?: boolean; // Pad index numbers with 0, e.g. 01, 02, 03, ...
-  zeroBasedArrayIndex?: boolean; // Start array index from 0
+  disablePadIndex?: boolean; // Disables padding of array index numbers if forceIndex = true
+  zeroBasedArrayIndex?: boolean; // start array index from 0 if forceIndex = true
   channelName?: string; // Set name of the root channel.
   preferedArrayName?: string; // Set key to use this as an array entry name.
   preferedArrayDesc?: string;
@@ -57,8 +57,8 @@ class Json2iob {
    * @param {Options} [options={}] - The parsing options.
    * @param {boolean} [options.write] - Activate write for all states.
    * @param {boolean} [options.forceIndex] - Instead of trying to find names for array entries, use the index as the name.
-   * @param {boolean} [options.padArrayIndex] - Pad index numbers with 0, e.g. 01, 02, 03, ...
-   * @param {boolean} [options.zeroBasedArrayIndex] - Start array index from 0
+   * @param {boolean} [options.disablePadIndex] - Disables padding of array index numbers if forceIndex = true
+   * @param {boolean} [options.zeroBasedArrayIndex] - Start array index from 0 if forceIndex = true
    * @param {string} [options.channelName] - Set name of the root channel.
    * @param {string} [options.preferedArrayName] - Set key to use this as an array entry name.
    * @param {string} [options.preferedArrayDesc] - Set key to use this as an array entry description.
@@ -447,7 +447,7 @@ class Json2iob {
               indexNumber -= 1;
           }
 
-          index = `${(options.padArrayIndex === true || options.padArrayIndex === undefined) && indexNumber < 10 ? "0" : ""}${indexNumber}`;
+          index = `${options.disablePadIndex === false && indexNumber < 10 ? "0" : ""}${indexNumber}`;
           arrayPath = key + index;
         }
         //special case array with 2 string objects

@@ -22,9 +22,9 @@ write //set common write variable to true
 forceIndex //instead of trying to find names for array entries, use the index as the name.
 Otherweise the value of a key with id, name, label, labelText will use a name. This is key overriden by preferedArrayName
 
-padArrayIndex //pad index numbers with 0, e.g. 01, 02, 03, ...
+disablePadIndex //disables padding of array index numbers if forceIndex = true
 
-zeroBasedArrayIndex //start array index from 0
+zeroBasedArrayIndex //start array index from 0 if forceIndex = true
 
 preferedArrayName //set key to use this as an array entry name
 
