@@ -52,7 +52,7 @@ class JsonObject {
    * @param state Value of the state
    * @param children Child objects / states
    */
-  constructor(path: string, state?: any | undefined, mode?: Mode | undefined, common?: iobCommon, options?: JsonObjectOptions, children: JsonObject[] = []) {
+  constructor(path: string, state?: any | undefined, mode?: Mode | undefined, common?: iobCommon, options: JsonObjectOptions = { write: false}, children: JsonObject[] = []) {
     this.path = path;
     this.state = state;
     this.children = children;
@@ -90,7 +90,7 @@ interface ILogProvider {
 class Json2iob {
   private adapter: any;
   private log : ILogProvider;
-  private alreadyCreatedObjects: any;
+  private alreadyCreatedObjects : Record<string, JsonObject> = {}
   private objectTypes: any;
   private forbiddenCharsRegex: RegExp;
 
@@ -133,29 +133,14 @@ class Json2iob {
    */
   async deserializeAsync(path: string, element: any, options: Options = { write: false }) : Promise<JsonObject | undefined> {
     if (path === null || path === undefined || path === "") {
-      this.log.debug("Cannot extract to path: " + path);
+      this.log.debug(`Cannot extract to path '${path}'`);
       return undefined;
     }
     
     if (element === null || element === undefined) {
-      this.log.debug("Cannot extract empty: " + path);
+      this.log.debug(`Cannot extract element '${element}' to path '${path}'`);
       return undefined;
     }
-
-    if (
-      (options.parseBase64 && this._isBase64(element)) ||
-      (options.parseBase64byIds && options.parseBase64byIds.includes(path))
-    ) {
-      try {
-        element = Buffer.from(element, "base64").toString("utf8");
-        if (this._isJsonString(element)) {
-          element = JSONbig.parse(element);
-        }
-      } catch (error) {
-        this.log.warn(`Cannot parse base64 for ${path}: ${error}`);
-      }
-    }
-    const objectKeys = Object.keys(element);
 
     if (!options || !options.write) {
       if (!options) {
@@ -167,33 +152,79 @@ class Json2iob {
 
     path = path.toString().replace(this.forbiddenCharsRegex, "_");
     const pathSegments = path.split(".");
+    const lastPathElement = pathSegments.pop();
+
+    if (!lastPathElement) {
+      this.log.warn(`Invalid path ${path}`);
+      return undefined;
+    } 
+
+    const jsonObjectOptions = <JsonObjectOptions> { write: options.write };
+
+    if (this._pathHasEnding(lastPathElement?.toLowerCase(), options.excludeStateWithEnding)) {
+      return new JsonObject(path, element, "skipEnding", undefined, jsonObjectOptions);
+    }
     
     if (options.removePasswords && path.toString().toLowerCase().includes("password")) {
-      return new JsonObject(path, element, "skipPassword");
+      return new JsonObject(path, element, "skipPassword", undefined, jsonObjectOptions);
+    }   
+
+    if (this._isJsonString(element) && options.autoCast) {
+      element = JSONbig.parse(element);
     }
 
-    if (typeof element === "string" || typeof element === "number") {
+    if (typeof element === "function") {
+      return new JsonObject(path, element, "skipFunction", undefined, jsonObjectOptions)
+    }
+
+    const isStringElement = typeof element === "string";
+    const isNumberElement = typeof element === "number";
+    const isBooleanElement = typeof element === "boolean";
+    const stateAlreadyCreated = this.alreadyCreatedObjects[path] !== undefined;
+
+    if (isStringElement || isNumberElement || isBooleanElement) {
       //remove ending . from path
       if (path.endsWith(".")) {
         path = path.slice(0, -1);
       }
 
-      const lastPathElement = pathSegments.pop();
-      if (options.excludeStateWithEnding && this._pathHasEnding(lastPathElement?.toLowerCase(), options.excludeStateWithEnding)) {
-        return new JsonObject(path, element, "skipEnding");
+      if (this._shouldParseBase64(path, element, options)) {
+        try {
+          element = Buffer.from(element, "base64").toString("utf8");
+          if (this._isJsonString(element)) {
+            element = JSONbig.parse(element);
+          }
+        } catch (error) {
+          this.log.warn(`Cannot parse base64 for ${path}: ${error}`);
+        }
       }
 
-      const makeWriteable = options.makeStateWritableWithEnding &&  this._pathHasEnding(lastPathElement?.toLowerCase(), options.makeStateWritableWithEnding);
-      if (makeWriteable) {
+      const makeStateWriteable = this._pathHasEnding(lastPathElement?.toLowerCase(), options.makeStateWritableWithEnding);
+      const stateIsWriteable = options.write || makeStateWriteable;
+      if (makeStateWriteable) {
         this.log.debug(`make state with ending writable: ${path}`);
       }
+      let objectName = lastPathElement;
+      if (options.descriptions && options.descriptions[lastPathElement]) {
+        objectName = options.descriptions[lastPathElement];
+      }
 
-      if (!this.alreadyCreatedObjects[path] || this.objectTypes[path] !== typeof element) {
+      const common: iobCommon = {
+        name: objectName,
+        role: this._getRole(element, stateIsWriteable),
+        write: stateIsWriteable,
+        read: true,
+        type: typeof element,
+        states: undefined
+      };
+
+      if (!stateAlreadyCreated || this._stateTypeChanged(path, element, this.objectTypes)) {
         let type = element !== null ? typeof element : "mixed";
-        if (this.objectTypes[path] && this.objectTypes[path] !== typeof element) {
+        if (this.objectTypes[path]) {
           type = "mixed";
           this.log.debug(`Type changed for ${path} from ${this.objectTypes[path]} to ${type}`);
         }
+
         let states;
         if (options.states && options.states[path]) {
           states = options.states[path];
@@ -202,23 +233,15 @@ class Json2iob {
           }
         }
 
-        const common: iobCommon = {
-          name: lastPathElement,
-          role: this._getRole(element, makeWriteable || false),
-          type: type,
-          write: makeWriteable,
-          read: true,
-          states: states,
-        };
+        common.type = type;
+        common.states = states;
+        common.unit = options.units?.[path];
 
-        if (options.units && options.units[path]) {
-          common.unit = options.units[path];
-        }
         //await this._createState(path, common, options);
-        return new JsonObject(path, element, "create", common, {write: makeWriteable});
+        return new JsonObject(path, element, "create", common, {write: stateIsWriteable});
       }
       //await this.adapter.setStateAsync(path, element, true);
-      return new JsonObject(path, element, "update");
+      return new JsonObject(path, element, "update", common, jsonObjectOptions);
     }
 
     if (Array.isArray(element)) {
@@ -226,111 +249,36 @@ class Json2iob {
       return result;
     }
 
-    const jsonObject = new JsonObject(path, undefined, "create");
-    for (const key of objectKeys) {
-      
-      if (typeof element[key] === "function") {
-        //this.log.debug("Skip function: " + path + "." + key);
-        jsonObject.children.push(new JsonObject(path + "." + key, element[key], "skipFunction"));
-        continue;
-      }
-      if (element[key] == null) {
-        element[key] = "";
-      }
-      if (this._isJsonString(element[key]) && options.autoCast) {
-        element[key] = JSONbig.parse(element[key]);
-      }
+    if (typeof element === "object") {      
+      const jsonObject = new JsonObject(path, undefined, "create", undefined, jsonObjectOptions);
 
-      
-
-      if (Array.isArray(element[key])) {
-        const result = await this._extractArray(element, key, path, options);
-        if (result) {
-          jsonObject.children.push(result);
-        }
-      } else if (element[key] !== null && typeof element[key] === "object") {
+      const objectKeys = Object.keys(element);
+      for (const key of objectKeys) {      
         const childObject = await this.deserializeAsync(path + "." + key, element[key], options);
         if (childObject) {
           jsonObject.children.push(childObject);
         }
-      } else {
-        const pathKey = key.replace(/\./g, "_");
-        if (
-          !this.alreadyCreatedObjects[path + "." + pathKey] ||
-          this.objectTypes[path + "." + pathKey] !== typeof element[key]
-        ) {
-          let objectName = key;
-          if (options.descriptions && options.descriptions[key]) {
-            objectName = options.descriptions[key];
-          }
-          let type = element[key] !== null ? typeof element[key] : "mixed";
-          if (
-            this.objectTypes[path + "." + pathKey] &&
-            this.objectTypes[path + "." + pathKey] !== typeof element[key]
-          ) {
-            type = "mixed";
-            this.log.debug(
-              `Type changed for ${path + "." + pathKey} from ${this.objectTypes[path + "." + pathKey]} to ${type}`,
-            );
-          }
-          let states;
-          if (options.states && options.states[key]) {
-            states = options.states[key];
-            if (!states[element[key]]) {
-              states[element[key]] = element[key];
-            }
-          }
-
-          const common: iobCommon = {
-            name: objectName,
-            role: this._getRole(element[key], options.write || false),
-            type: type,
-            write: options.write,
-            read: true,
-            states: states,
-          };
-
-          if (options.units && options.units[key]) {
-            common.unit = options.units[key]; // Assign the value to the 'unit' property
-          }
-          //await this._createState(path + "." + pathKey, common, options);
-          jsonObject.children.push(new JsonObject(path + "." + pathKey, element[key], "create", common));
-          continue;
-        }
-        //await this.adapter.setStateAsync(path + "." + pathKey, element[key], true);
-        jsonObject.children.push(new JsonObject(path + "." + pathKey, element[key], "update"));
       }
-    }
 
-    return jsonObject;
+      return jsonObject;
+    }    
+    
+    this.log.error(`Unsupported element type '${typeof element}'`);
+    return undefined;
   }
   
   async writeAsync(object: JsonObject, options: Options = { write: false }) : Promise<void> {
-    if (object.mode == "create") {
-      this._createState(object.path, object.common, options);
-    } else if (object.mode.startsWith("skip")) {
-      this.log.debug(`Skipping ${object.path} (Reason '${object.mode}')`)
-      return;
+    if (options.deleteBeforeUpdate && this.alreadyCreatedObjects[object.path]) {
+      this.log.debug(`Deleting ${object.path} before update`);
+      for (const key in this.alreadyCreatedObjects) {
+        if (key.startsWith(object.path)) {
+          delete this.alreadyCreatedObjects[key];
+        }
+      }
+      await this.adapter.delObjectAsync(object.path, { recursive: true });
     }
 
-    if (!this.alreadyCreatedObjects[object.path] || options.deleteBeforeUpdate) {
-      if (options.makeStateWritableWithEnding) {
-        for (const writingEnding of options.makeStateWritableWithEnding) {
-          if (object.path.toLowerCase().endsWith(writingEnding)) {
-            this.log.debug(`make state with ending writable : ${object.path}`);
-            options.write = true;
-          }
-        }
-      }
-      if (options.deleteBeforeUpdate) {
-        this.log.debug(`Deleting ${object.path} before update`);
-        for (const key in this.alreadyCreatedObjects) {
-          if (key.startsWith(object.path)) {
-            delete this.alreadyCreatedObjects[key];
-          }
-        }
-        await this.adapter.delObjectAsync(object.path, { recursive: true });
-      }
+    if (!this.alreadyCreatedObjects[object.path]) {
       let name = options.channelName || "";
       if (options.preferedArrayDesc && object.state[options.preferedArrayDesc]) {
         name = object.state[options.preferedArrayDesc];
@@ -347,7 +295,7 @@ class Json2iob {
         })
         .then(() => {
           if (!options.dontSaveCreatedObjects) {
-            this.alreadyCreatedObjects[object.path] = true;
+            this.alreadyCreatedObjects[object.path] = object;
           }
           options.channelName = undefined;
           options.deleteBeforeUpdate = undefined;
@@ -355,6 +303,15 @@ class Json2iob {
         .catch((error: any) => {
           this.adapter.log.error(error);
         });
+    }
+
+    if (object.mode.startsWith("skip")) {
+      this.log.debug(`Skipping ${object.path} (Reason '${object.mode}')`)
+      return;
+    } else if (object.mode == "create"
+        || !this.alreadyCreatedObjects[object.path]) {
+      this._createState(object, options);
+      return;
     }
 
     await this.adapter.setStateAsync(object.path, object.state, true);
@@ -368,7 +325,7 @@ class Json2iob {
     try {
       const deserializedObject = await this.deserializeAsync(path, element);
 
-      if (deserializedObject === undefined) {
+      if (!deserializedObject) {
         return;
       }
 
@@ -378,6 +335,7 @@ class Json2iob {
       this.log.error(error);
     }
   }
+  
   /**
    * Creates a state object in the adapter's namespace.
    * @param {string} path - The path of the state object.
@@ -386,18 +344,21 @@ class Json2iob {
    * @param {boolean} [options.dontSaveCreatedObjects] - If true, the created object will not be saved.
    * @returns {Promise<void>} - A promise that resolves when the state object is created.
    */
-  private async _createState(path: string, common: any, options: Options = {}): Promise<void> {
+  private async _createState(object: JsonObject, options: Options = {}): Promise<void> {
     await this.adapter
-      .extendObjectAsync(path, {
+      .extendObjectAsync(object.path, {
         type: "state",
-        common: common,
+        common: object.common,
         native: {},
       })
       .then(() => {
         if (!options.dontSaveCreatedObjects) {
-          this.alreadyCreatedObjects[path] = true;
+          this.alreadyCreatedObjects[object.path] = object;
         }
-        this.objectTypes[path] = common.type;
+
+        if (object.common) {
+          this.objectTypes[object.path] = object.common.type;
+        }
       })
       .catch((error: any) => {
         this.log.error(error);
@@ -419,7 +380,8 @@ class Json2iob {
         element = element[key];
       }
 
-      const jsonObject = new JsonObject(path + (this._isNullOrEmpty(key) ? "" : ("." + key)), undefined, "array");
+      const jsonObjectOptions = <JsonObjectOptions> { write: options.write };
+      const jsonObject = new JsonObject(path + (this._isNullOrEmpty(key) ? "" : ("." + key)), undefined, "array", undefined, jsonObjectOptions);
 
       for (let index in element) {
         let arrayElement = element[index];
@@ -461,8 +423,7 @@ class Json2iob {
               arrayPath = arrayElement[keyName];
             }
           }
-        }
-        for (const keyName in Object.keys(arrayElement)) {
+          
           if (keyName.endsWith("Name")) {
             if (arrayElement[keyName] && arrayElement[keyName].replace) {
               arrayPath = arrayElement[keyName].replace(/\./g, "");
@@ -527,9 +488,9 @@ class Json2iob {
 
           if (options.disablePadIndex) {
             index = indexNumber.toString();
-          } else if (indexNumber < 10) {
+          } else {
             // reassign index in case zeroBasedarrayIndex is enabled
-            index = `0${indexNumber}`;
+            index = `${indexNumber < 10 ? "0" : ""}${indexNumber}`;
           }
 
           arrayPath = (this._isNullOrEmpty(key) ? "" : key + ".") + index;
@@ -585,11 +546,18 @@ class Json2iob {
                 states[subValue] = subValue;
               }
             }
+
+            const makeStateWriteable = this._pathHasEnding(subName?.toLowerCase(), options.makeStateWritableWithEnding);
+            const stateIsWriteable = options.write || makeStateWriteable;
+            if (makeStateWriteable) {
+              this.log.debug(`make state with ending writable: ${path}`);
+            }
+
             const common: iobCommon = {
               name: subName,
-              role: this._getRole(subValue, options.write || false),
+              role: this._getRole(subValue, stateIsWriteable),
               type: type,
-              write: options.write,
+              write: stateIsWriteable,
               read: true,
               states: states,
             };
@@ -597,13 +565,14 @@ class Json2iob {
               common.unit = options.units[subKey];
             }
             //await this._createState(path + "." + subKey, common, options);
-            jsonObject.children.push(new JsonObject(path + "." + subKey, subValue, "create", common));
+            jsonObject.children.push(new JsonObject(path + "." + subKey, subValue, "create", common, jsonObjectOptions));
             continue;
           }
           //await this.adapter.setStateAsync(path + "." + subKey, subValue, true);
-          jsonObject.children.push(new JsonObject(path + "." + subKey, subValue, "update"));
+          jsonObject.children.push(new JsonObject(path + "." + subKey, subValue, "update", undefined, jsonObjectOptions));
           continue;
         }
+
         const childObject = await this.deserializeAsync(path + "." + arrayPath, arrayElement, options);
         if (childObject) {
           jsonObject.children.push(childObject);
@@ -680,7 +649,7 @@ class Json2iob {
    * @param str Test candiate
    * @returns True if str is null or undefined or empty, otherwise false
    */
-  private _isNullOrEmpty(str: string): boolean {
+  private _isNullOrEmpty(str: string | undefined): boolean {
     return !str || str.length === 0;
   }
 
@@ -690,18 +659,26 @@ class Json2iob {
    * @param endings Path endings to exclude
    * @returns True if the path ends with any ending provided in endings
    */
-  private _pathHasEnding(path: string | undefined, endings: string[]): boolean {
-    if (!path) {
+  private _pathHasEnding(path: string | undefined, endings: string[] | undefined): boolean {
+    if (this._isNullOrEmpty(path) || !endings) {
       return false;
     }
 
     for (const excludeEnding of endings) {
-      if (path.endsWith(excludeEnding)) {
+      if (path!.endsWith(excludeEnding)) {
         return true;
       }
     }
 
     return false;
+  }
+
+  private _shouldParseBase64(path: string, element: any, options: Options) {
+    return typeof element === "string" && (options.parseBase64 && this._isBase64(element)) || (options.parseBase64byIds && options.parseBase64byIds.includes(path));
+  }
+
+  private _stateTypeChanged(path: string, element: any, objectTypes: any) {
+    return objectTypes[path] !== typeof element;
   }
 }
 
