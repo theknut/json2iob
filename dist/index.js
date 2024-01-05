@@ -3,8 +3,20 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 const json_bigint_1 = __importDefault(require("json-bigint"));
+class JsonObject {
+    path;
+    state;
+    children = [];
+}
+class PendingJsonObject extends JsonObject {
+    common;
+}
+class SkippedJsonObject extends JsonObject {
+    reason;
+}
 class Json2iob {
     adapter;
+    log;
     alreadyCreatedObjects;
     objectTypes;
     forbiddenCharsRegex;
@@ -13,6 +25,7 @@ class Json2iob {
             throw new Error("ioBroker Adapter is not defined!");
         }
         this.adapter = adapter;
+        this.log = this.adapter ?? console;
         this.alreadyCreatedObjects = {};
         this.objectTypes = {};
         this.forbiddenCharsRegex = /[^._\-/ :!#$%&()+=@^{}|~\p{Ll}\p{Lu}\p{Nd}]+/gu;
@@ -46,218 +59,246 @@ class Json2iob {
      * @param {boolean} [options.dontSaveCreatedObjects] - Create objects but do not save them to alreadyCreatedObjects.
      * @returns {Promise<void>} - A promise that resolves when the parsing is complete.
      */
-    async parse(path, element, options = { write: false }) {
-        try {
-            if (element === null || element === undefined) {
-                this.adapter.log.debug("Cannot extract empty: " + path);
-                return;
+    async deserializeAsync(path, element, options = { write: false }) {
+        if (element === null || element === undefined) {
+            this.log.debug("Cannot extract empty: " + path);
+            return undefined;
+        }
+        if ((options.parseBase64 && this._isBase64(element)) ||
+            (options.parseBase64byIds && options.parseBase64byIds.includes(path))) {
+            try {
+                element = Buffer.from(element, "base64").toString("utf8");
+                if (this._isJsonString(element)) {
+                    element = json_bigint_1.default.parse(element);
+                }
             }
-            if ((options.parseBase64 && this._isBase64(element)) ||
-                (options.parseBase64byIds && options.parseBase64byIds.includes(path))) {
+            catch (error) {
+                this.log.warn(`Cannot parse base64 for ${path}: ${error}`);
+            }
+        }
+        const objectKeys = Object.keys(element);
+        if (!options || !options.write) {
+            if (!options) {
+                options = { write: false };
+            }
+            else {
+                options["write"] = false;
+            }
+        }
+        path = path.toString().replace(this.forbiddenCharsRegex, "_");
+        const pathSegments = path.split(".");
+        if (typeof element === "string" || typeof element === "number") {
+            //remove ending . from path
+            if (path.endsWith(".")) {
+                path = path.slice(0, -1);
+            }
+            const lastPathElement = pathSegments.pop();
+            if (options.excludeStateWithEnding && lastPathElement) {
+                for (const excludeEnding of options.excludeStateWithEnding) {
+                    if (lastPathElement.endsWith(excludeEnding)) {
+                        this.log.debug(`skip state with ending : ${path}`);
+                        return undefined;
+                    }
+                }
+            }
+            if (options.makeStateWritableWithEnding && lastPathElement) {
+                for (const writingEnding of options.makeStateWritableWithEnding) {
+                    if (lastPathElement.toLowerCase().endsWith(writingEnding)) {
+                        this.log.debug(`make state with ending writable : ${path}`);
+                        options.write = true;
+                    }
+                }
+            }
+            if (!this.alreadyCreatedObjects[path] || this.objectTypes[path] !== typeof element) {
+                let type = element !== null ? typeof element : "mixed";
+                if (this.objectTypes[path] && this.objectTypes[path] !== typeof element) {
+                    type = "mixed";
+                    this.log.debug(`Type changed for ${path} from ${this.objectTypes[path]} to ${type}`);
+                }
+                let states;
+                if (options.states && options.states[path]) {
+                    states = options.states[path];
+                    if (!states[element]) {
+                        states[element] = element;
+                    }
+                }
+                const common = {
+                    name: lastPathElement,
+                    role: this._getRole(element, options.write || false),
+                    type: type,
+                    write: options.write,
+                    read: true,
+                    states: states,
+                };
+                if (options.units && options.units[path]) {
+                    common.unit = options.units[path];
+                }
+                //await this._createState(path, common, options);
+                return { path: path, common: common, state: element };
+            }
+            //await this.adapter.setStateAsync(path, element, true);
+            return { path: path, state: element };
+        }
+        if (options.removePasswords && path.toString().toLowerCase().includes("password")) {
+            return { path: path, state: element, reason: "password" };
+        }
+        if ((!this.alreadyCreatedObjects[path] || options.deleteBeforeUpdate) && options.excludeStateWithEnding) {
+            for (const excludeEnding of options.excludeStateWithEnding) {
+                if (path.endsWith(excludeEnding)) {
+                    //this.log.debug(`skip state with ending : ${path}`);
+                    return { path: path, state: element, reason: "ending" };
+                }
+            }
+        }
+        if (Array.isArray(element)) {
+            await this._extractArray(element, "", path, options);
+            return undefined;
+        }
+        let jsonObject = { path: path };
+        for (const key of objectKeys) {
+            if (key.toLowerCase().includes("password") && options.removePasswords) {
+                return { path: path, state: element, reason: "password" };
+            }
+            if (typeof element[key] === "function") {
+                this.log.debug("Skip function: " + path + "." + key);
+                jsonObject.children.push({ path: path + "." + key, state: element[key], reason: "function" });
+                continue;
+            }
+            if (element[key] == null) {
+                element[key] = "";
+            }
+            if (this._isJsonString(element[key]) && options.autoCast) {
+                element[key] = json_bigint_1.default.parse(element[key]);
+            }
+            if ((options.parseBase64 && this._isBase64(element[key])) ||
+                (options.parseBase64byIds && options.parseBase64byIds.includes(key))) {
                 try {
-                    element = Buffer.from(element, "base64").toString("utf8");
-                    if (this._isJsonString(element)) {
-                        element = json_bigint_1.default.parse(element);
+                    element[key] = Buffer.from(element[key], "base64").toString("utf8");
+                    if (this._isJsonString(element[key])) {
+                        element[key] = json_bigint_1.default.parse(element[key]);
                     }
                 }
                 catch (error) {
-                    this.adapter.log.warn(`Cannot parse base64 for ${path}: ${error}`);
+                    this.log.warn(`Cannot parse base64 for ${path + "." + key}: ${error}`);
                 }
             }
-            const objectKeys = Object.keys(element);
-            if (!options || !options.write) {
-                if (!options) {
-                    options = { write: false };
-                }
-                else {
-                    options["write"] = false;
+            if (Array.isArray(element[key])) {
+                await this._extractArray(element, key, path, options);
+            }
+            else if (element[key] !== null && typeof element[key] === "object") {
+                const childObject = await this.deserializeAsync(path + "." + key, element[key], options);
+                if (childObject) {
+                    jsonObject.children.push(childObject);
                 }
             }
-            path = path.toString().replace(this.forbiddenCharsRegex, "_");
-            if (typeof element === "string" || typeof element === "number") {
-                //remove ending . from path
-                if (path.endsWith(".")) {
-                    path = path.slice(0, -1);
-                }
-                const lastPathElement = path.split(".").pop();
-                if (options.excludeStateWithEnding && lastPathElement) {
-                    for (const excludeEnding of options.excludeStateWithEnding) {
-                        if (lastPathElement.endsWith(excludeEnding)) {
-                            this.adapter.log.debug(`skip state with ending : ${path}`);
-                            return;
-                        }
+            else {
+                const pathKey = key.replace(/\./g, "_");
+                if (!this.alreadyCreatedObjects[path + "." + pathKey] ||
+                    this.objectTypes[path + "." + pathKey] !== typeof element[key]) {
+                    let objectName = key;
+                    if (options.descriptions && options.descriptions[key]) {
+                        objectName = options.descriptions[key];
                     }
-                }
-                if (options.makeStateWritableWithEnding && lastPathElement) {
-                    for (const writingEnding of options.makeStateWritableWithEnding) {
-                        if (lastPathElement.toLowerCase().endsWith(writingEnding)) {
-                            this.adapter.log.debug(`make state with ending writable : ${path}`);
-                            options.write = true;
-                        }
-                    }
-                }
-                if (!this.alreadyCreatedObjects[path] || this.objectTypes[path] !== typeof element) {
-                    let type = element !== null ? typeof element : "mixed";
-                    if (this.objectTypes[path] && this.objectTypes[path] !== typeof element) {
+                    let type = element[key] !== null ? typeof element[key] : "mixed";
+                    if (this.objectTypes[path + "." + pathKey] &&
+                        this.objectTypes[path + "." + pathKey] !== typeof element[key]) {
                         type = "mixed";
-                        this.adapter.log.debug(`Type changed for ${path} from ${this.objectTypes[path]} to ${type}`);
+                        this.log.debug(`Type changed for ${path + "." + pathKey} from ${this.objectTypes[path + "." + pathKey]} to ${type}`);
                     }
                     let states;
-                    if (options.states && options.states[path]) {
-                        states = options.states[path];
-                        if (!states[element]) {
-                            states[element] = element;
+                    if (options.states && options.states[key]) {
+                        states = options.states[key];
+                        if (!states[element[key]]) {
+                            states[element[key]] = element[key];
                         }
                     }
                     const common = {
-                        name: lastPathElement,
-                        role: this._getRole(element, options.write || false),
+                        name: objectName,
+                        role: this._getRole(element[key], options.write || false),
                         type: type,
                         write: options.write,
                         read: true,
                         states: states,
                     };
-                    if (options.units && options.units[path]) {
-                        common.unit = options.units[path];
+                    if (options.units && options.units[key]) {
+                        common.unit = options.units[key]; // Assign the value to the 'unit' property
                     }
-                    await this._createState(path, common, options);
-                }
-                await this.adapter.setStateAsync(path, element, true);
-                return;
-            }
-            if (options.removePasswords && path.toString().toLowerCase().includes("password")) {
-                this.adapter.log.debug(`skip password : ${path}`);
-                return;
-            }
-            if (!this.alreadyCreatedObjects[path] || options.deleteBeforeUpdate) {
-                if (options.excludeStateWithEnding) {
-                    for (const excludeEnding of options.excludeStateWithEnding) {
-                        if (path.endsWith(excludeEnding)) {
-                            this.adapter.log.debug(`skip state with ending : ${path}`);
-                            return;
-                        }
-                    }
-                }
-                if (options.makeStateWritableWithEnding) {
-                    for (const writingEnding of options.makeStateWritableWithEnding) {
-                        if (path.toLowerCase().endsWith(writingEnding)) {
-                            this.adapter.log.debug(`make state with ending writable : ${path}`);
-                            options.write = true;
-                        }
-                    }
-                }
-                if (options.deleteBeforeUpdate) {
-                    this.adapter.log.debug(`Deleting ${path} before update`);
-                    for (const key in this.alreadyCreatedObjects) {
-                        if (key.startsWith(path)) {
-                            delete this.alreadyCreatedObjects[key];
-                        }
-                    }
-                    await this.adapter.delObjectAsync(path, { recursive: true });
-                }
-                let name = options.channelName || "";
-                if (options.preferedArrayDesc && element[options.preferedArrayDesc]) {
-                    name = element[options.preferedArrayDesc];
-                }
-                await this.adapter
-                    .setObjectNotExistsAsync(path, {
-                    type: "channel",
-                    common: {
-                        name: name,
-                        write: false,
-                        read: true,
-                    },
-                    native: {},
-                })
-                    .then(() => {
-                    if (!options.dontSaveCreatedObjects) {
-                        this.alreadyCreatedObjects[path] = true;
-                    }
-                    options.channelName = undefined;
-                    options.deleteBeforeUpdate = undefined;
-                })
-                    .catch((error) => {
-                    this.adapter.log.error(error);
-                });
-            }
-            if (Array.isArray(element)) {
-                await this._extractArray(element, "", path, options);
-                return;
-            }
-            for (const key of objectKeys) {
-                if (key.toLowerCase().includes("password") && options.removePasswords) {
-                    this.adapter.log.debug(`skip password : ${path}.${key}`);
-                    return;
-                }
-                if (typeof element[key] === "function") {
-                    this.adapter.log.debug("Skip function: " + path + "." + key);
+                    //await this._createState(path + "." + pathKey, common, options);
+                    jsonObject.children.push({ path: path + "." + pathKey, common: common, state: element[key] });
                     continue;
                 }
-                if (element[key] == null) {
-                    element[key] = "";
-                }
-                if (this._isJsonString(element[key]) && options.autoCast) {
-                    element[key] = json_bigint_1.default.parse(element[key]);
-                }
-                if ((options.parseBase64 && this._isBase64(element[key])) ||
-                    (options.parseBase64byIds && options.parseBase64byIds.includes(key))) {
-                    try {
-                        element[key] = Buffer.from(element[key], "base64").toString("utf8");
-                        if (this._isJsonString(element[key])) {
-                            element[key] = json_bigint_1.default.parse(element[key]);
-                        }
-                    }
-                    catch (error) {
-                        this.adapter.log.warn(`Cannot parse base64 for ${path + "." + key}: ${error}`);
-                    }
-                }
-                if (Array.isArray(element[key])) {
-                    await this._extractArray(element, key, path, options);
-                }
-                else if (element[key] !== null && typeof element[key] === "object") {
-                    await this.parse(path + "." + key, element[key], options);
-                }
-                else {
-                    const pathKey = key.replace(/\./g, "_");
-                    if (!this.alreadyCreatedObjects[path + "." + pathKey] ||
-                        this.objectTypes[path + "." + pathKey] !== typeof element[key]) {
-                        let objectName = key;
-                        if (options.descriptions && options.descriptions[key]) {
-                            objectName = options.descriptions[key];
-                        }
-                        let type = element[key] !== null ? typeof element[key] : "mixed";
-                        if (this.objectTypes[path + "." + pathKey] &&
-                            this.objectTypes[path + "." + pathKey] !== typeof element[key]) {
-                            type = "mixed";
-                            this.adapter.log.debug(`Type changed for ${path + "." + pathKey} from ${this.objectTypes[path + "." + pathKey]} to ${type}`);
-                        }
-                        let states;
-                        if (options.states && options.states[key]) {
-                            states = options.states[key];
-                            if (!states[element[key]]) {
-                                states[element[key]] = element[key];
-                            }
-                        }
-                        const common = {
-                            name: objectName,
-                            role: this._getRole(element[key], options.write || false),
-                            type: type,
-                            write: options.write,
-                            read: true,
-                            states: states,
-                        };
-                        if (options.units && options.units[key]) {
-                            common.unit = options.units[key]; // Assign the value to the 'unit' property
-                        }
-                        await this._createState(path + "." + pathKey, common, options);
-                    }
-                    await this.adapter.setStateAsync(path + "." + pathKey, element[key], true);
-                }
+                //await this.adapter.setStateAsync(path + "." + pathKey, element[key], true);
+                jsonObject.children.push({ path: path + "." + pathKey, state: element[key] });
             }
         }
+    }
+    async writeAsync(object, options = { write: false }) {
+        if (object instanceof PendingJsonObject) {
+            this._createState(object.path, object.common, options);
+        }
+        else if (object instanceof SkippedJsonObject) {
+            this.log.debug(`Skipping ${object.path} (Reason '${object.reason}')`);
+            return;
+        }
+        if (!this.alreadyCreatedObjects[object.path] || options.deleteBeforeUpdate) {
+            if (options.makeStateWritableWithEnding) {
+                for (const writingEnding of options.makeStateWritableWithEnding) {
+                    if (object.path.toLowerCase().endsWith(writingEnding)) {
+                        this.log.debug(`make state with ending writable : ${object.path}`);
+                        options.write = true;
+                    }
+                }
+            }
+            if (options.deleteBeforeUpdate) {
+                this.log.debug(`Deleting ${object.path} before update`);
+                for (const key in this.alreadyCreatedObjects) {
+                    if (key.startsWith(object.path)) {
+                        delete this.alreadyCreatedObjects[key];
+                    }
+                }
+                await this.adapter.delObjectAsync(object.path, { recursive: true });
+            }
+            let name = options.channelName || "";
+            if (options.preferedArrayDesc && object.state[options.preferedArrayDesc]) {
+                name = object.state[options.preferedArrayDesc];
+            }
+            await this.adapter
+                .setObjectNotExistsAsync(object.path, {
+                type: "channel",
+                common: {
+                    name: name,
+                    write: false,
+                    read: true,
+                },
+                native: {},
+            })
+                .then(() => {
+                if (!options.dontSaveCreatedObjects) {
+                    this.alreadyCreatedObjects[object.path] = true;
+                }
+                options.channelName = undefined;
+                options.deleteBeforeUpdate = undefined;
+            })
+                .catch((error) => {
+                this.adapter.log.error(error);
+            });
+        }
+        await this.adapter.setStateAsync(object.path, object.state, true);
+        for (const childObject of object.children) {
+            await this.writeAsync(childObject, options);
+        }
+    }
+    async parse(path, element, options = { write: false }) {
+        try {
+            const deserializedObject = await this.deserializeAsync(path, element);
+            if (deserializedObject === undefined) {
+                return;
+            }
+            await this.writeAsync(deserializedObject, options);
+        }
         catch (error) {
-            this.adapter.log.error("Error extract keys: " + path + " " + JSON.stringify(element));
-            this.adapter.log.error(error);
+            this.log.error("Error extract keys: " + path + " " + JSON.stringify(element));
+            this.log.error(error);
         }
     }
     /**
@@ -282,7 +323,7 @@ class Json2iob {
             this.objectTypes[path] = common.type;
         })
             .catch((error) => {
-            this.adapter.log.error(error);
+            this.log.error(error);
         });
     }
     /**
@@ -299,10 +340,11 @@ class Json2iob {
             if (key) {
                 element = element[key];
             }
+            let jsonObject = { path: path + "." + key };
             for (let index in element) {
                 let arrayElement = element[index];
                 if (arrayElement == null) {
-                    this.adapter.log.debug("Cannot extract empty: " + path + "." + key + "." + index);
+                    this.log.debug("Cannot extract empty: " + path + "." + key + "." + index);
                     continue;
                 }
                 let indexNumber = parseInt(index) + 1;
@@ -316,12 +358,15 @@ class Json2iob {
                         arrayElement = element[index];
                     }
                     catch (error) {
-                        this.adapter.log.warn(`Cannot parse json value for ${path + "." + key + "." + index}: ${error}`);
+                        this.log.warn(`Cannot parse json value for ${path + "." + key + "." + index}: ${error}`);
                     }
                 }
                 let arrayPath = key + index;
                 if (typeof arrayElement === "string" && key !== "") {
-                    await this.parse(path + "." + key + "." + arrayElement, arrayElement, options);
+                    const childObject = await this.deserializeAsync(path + "." + key + "." + arrayElement, arrayElement, options);
+                    if (childObject) {
+                        jsonObject.children.push(childObject);
+                    }
                     continue;
                 }
                 if (typeof arrayElement[Object.keys(arrayElement)[0]] === "string") {
@@ -430,7 +475,7 @@ class Json2iob {
                             }
                         }
                         catch (error) {
-                            this.adapter.log.warn(`Cannot parse base64 value ${subValue} for ${path + "." + subKey}: ${error}`);
+                            this.log.warn(`Cannot parse base64 value ${subValue} for ${path + "." + subKey}: ${error}`);
                         }
                     }
                     const subName = Object.keys(arrayElement)[0] + " " + Object.keys(arrayElement)[1];
@@ -441,7 +486,7 @@ class Json2iob {
                         this.objectTypes[path + "." + subKey] !== typeof subValue) {
                         let type = subValue !== null ? typeof subValue : "mixed";
                         if (this.objectTypes[path + "." + subKey] && this.objectTypes[path + "." + subKey] !== typeof subValue) {
-                            this.adapter.log.debug(`Type of ${path + "." + subKey} changed from ${this.objectTypes[path + "." + subKey]} to ${typeof subValue}!`);
+                            this.log.debug(`Type of ${path + "." + subKey} changed from ${this.objectTypes[path + "." + subKey]} to ${typeof subValue}!`);
                             type = "mixed";
                         }
                         let states;
@@ -462,18 +507,26 @@ class Json2iob {
                         if (options.units && options.units[subKey]) {
                             common.unit = options.units[subKey];
                         }
-                        await this._createState(path + "." + subKey, common, options);
+                        //await this._createState(path + "." + subKey, common, options);
+                        jsonObject.children.push({ path: path + "." + subKey, common: common, state: subValue });
+                        continue;
                     }
-                    await this.adapter.setStateAsync(path + "." + subKey, subValue, true);
+                    //await this.adapter.setStateAsync(path + "." + subKey, subValue, true);
+                    jsonObject.children.push({ path: path + "." + subKey, state: subValue });
                     continue;
                 }
-                await this.parse(path + "." + arrayPath, arrayElement, options);
+                const childObject = await this.deserializeAsync(path + "." + arrayPath, arrayElement, options);
+                if (childObject) {
+                    jsonObject.children.push(childObject);
+                }
             }
+            return jsonObject;
         }
         catch (error) {
-            this.adapter.log.error("Cannot extract array " + path);
-            this.adapter.log.error(error);
+            this.log.error("Cannot extract array " + path);
+            this.log.error(error);
         }
+        return undefined;
     }
     /**
      * Checks if a string is a valid base64 encoded string.

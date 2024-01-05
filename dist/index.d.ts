@@ -18,8 +18,14 @@ type Options = {
     makeStateWritableWithEnding?: string[];
     dontSaveCreatedObjects?: boolean;
 };
+declare class JsonObject {
+    path: string;
+    state: any;
+    children: JsonObject[];
+}
 declare class Json2iob {
     private adapter;
+    private log;
     private alreadyCreatedObjects;
     private objectTypes;
     private forbiddenCharsRegex;
@@ -50,6 +56,8 @@ declare class Json2iob {
      * @param {boolean} [options.dontSaveCreatedObjects] - Create objects but do not save them to alreadyCreatedObjects.
      * @returns {Promise<void>} - A promise that resolves when the parsing is complete.
      */
+    deserializeAsync(path: string, element: any, options?: Options): Promise<JsonObject | undefined>;
+    writeAsync(object: JsonObject, options?: Options): Promise<void>;
     parse(path: string, element: any, options?: Options): Promise<void>;
     /**
      * Creates a state object in the adapter's namespace.
@@ -59,7 +67,7 @@ declare class Json2iob {
      * @param {boolean} [options.dontSaveCreatedObjects] - If true, the created object will not be saved.
      * @returns {Promise<void>} - A promise that resolves when the state object is created.
      */
-    _createState(path: string, common: any, options?: Options): Promise<void>;
+    private _createState;
     /**
      * Extracts an array from the given element and recursively parses its elements.
      *
@@ -69,26 +77,26 @@ declare class Json2iob {
      * @param {object} options - The parsing options.
      * @returns {Promise<void>} - A promise that resolves when the array extraction and parsing is complete.
      */
-    _extractArray(element: any, key: string, path: string, options: Options): Promise<void>;
+    private _extractArray;
     /**
      * Checks if a string is a valid base64 encoded string.
      *
      * @param {string} str - The string to be checked.
      * @returns {boolean} - Returns true if the string is a valid base64 encoded string, otherwise returns false.
      */
-    _isBase64(str: string): boolean;
+    private _isBase64;
     /**
      * Checks if a given string is a valid JSON string.
      * @param {string} str - The string to be checked.
      * @returns {boolean} - Returns true if the string is a valid JSON string, otherwise false.
      */
-    _isJsonString(str: string): boolean;
+    private _isJsonString;
     /**
      * Determines the role of an element based on its type and write mode.
      * @param {any} element - The element to determine the role for.
      * @param {boolean} write - Indicates whether the element is being written to.
      * @returns {string} - The role of the element.
      */
-    _getRole(element: any, write: boolean): "indicator" | "switch" | "value.time" | "value" | "level" | "text" | "state";
+    private _getRole;
 }
 export = Json2iob;
