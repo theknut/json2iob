@@ -15,7 +15,8 @@
     "build": "tsc",
     "prepublishOnly": "npm run build",
     "test": "jest --watch-all --verbose",
-    "ci-test": "jest --verbose"
+    "ci-test": "jest --verbose",
+    "coverage": "jest --coverage"
   },
   "repository": {
     "type": "git",
