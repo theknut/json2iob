@@ -12,8 +12,11 @@ concurrency:
     group: ${{ github.ref }}
     cancel-in-progress: true
 
+env:
+    CI: true
+
 jobs:
-    adapter-tests:
+    ci-tests:
         if: contains(github.event.head_commit.message, '[skip ci]') == false
 
         runs-on: ${{ matrix.os }}
