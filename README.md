@@ -1,3 +1,5 @@
+![Tests](https://github.com/theknut/json2iob/actions/workflows/tests.yml/badge.svg)
+
 # Json2iob
 
 This package converts a json objects into ioBroker states. It can handle nested array and obects. It will also generated automaticly the type and roles based on the type of value.
