@@ -37,7 +37,7 @@ type IdObject = {
   name: string;
 };
 
-type Mode = ("create" | "update" | "array" | "skipEnding" | "skipPassword" | "skipFunction");
+type Mode = ("create" | "array" | "skipEnding" | "skipPassword" | "skipFunction");
 
 class JsonObject {
   path: string;
@@ -143,7 +143,7 @@ class Json2iob {
     }
 
     if (typeof element === "string" || typeof element === "number" || typeof element === "boolean") {
-      return this._jsonObjectFactory(path, element, "update", options);
+      return this._jsonObjectFactory(path, element, "create", options);
     }
 
     if (Array.isArray(element)) {
@@ -417,7 +417,7 @@ class Json2iob {
           }
 
           //await this.adapter.setStateAsync(path + "." + subKey, subValue, true);
-          jsonObject.children.push(this._jsonObjectFactory(path + "." + subKey, subValue, "update", options));
+          jsonObject.children.push(this._jsonObjectFactory(path + "." + subKey, subValue, "create", options));
           continue;
         }
 
@@ -579,10 +579,8 @@ class Json2iob {
       write: stateIsWriteable,
       read: true,
       states: states,
+      unit: options.units?.[idSegments.name]
     };
-    if (options.units && options.units[idSegments.name]) {
-      common.unit = options.units[idSegments.name];
-    }
 
     return new JsonObject(idSegments.path, state, mode, common, children);
   }

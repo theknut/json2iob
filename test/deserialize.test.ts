@@ -116,9 +116,6 @@ describe("deserializeAsync: non JSON object value", () => {
               unit: undefined,
               write: false,
             },
-            options: {
-                "write": false
-            },
             children: []
         });
     });
@@ -248,23 +245,23 @@ describe("deserializeAsync options: make writeable", () => {
     it("Should make state with ending writeable", async () => {
         const result = await model.deserializeAsync("path.to.state", '{"name" : "John", "title" : "MD" }', <Options> { makeStateWritableWithEnding: ["name"], autoCast: true });
         expect(result).toBeInstanceOf(JsonObject);
-        expect(result?.options?.write).toBe(false);
-        expect(result?.children[0].options?.write).toBe(true);
-        expect(result?.children[1].options?.write).toBe(false);
+        expect(result?.common?.write).toBe(false);
+        expect(result?.children[0].common?.write).toBe(true);
+        expect(result?.children[1].common?.write).toBe(false);
     });
     
     it("Should make state with ending writeable recursively", async () => {
         const result = await model.deserializeAsync("path.to.state", '[{"name" : "John", "title" : "MD" }, {"name" : "Jane", "title" : "" }]', <Options> { makeStateWritableWithEnding: ["name"], autoCast: true, forceIndex: true });
         expect(result).toBeInstanceOf(JsonObject);
-        expect(result?.options?.write).toBe(false);
-        expect(result?.children[0].options?.write).toBe(false);
-        expect(result?.children[1].options?.write).toBe(false);
+        expect(result?.common?.write).toBe(false);
+        expect(result?.children[0].common?.write).toBe(false);
+        expect(result?.children[1].common?.write).toBe(false);
 
-        expect(result?.children[0].children[0].options?.write).toBe(true);
-        expect(result?.children[0].children[1].options?.write).toBe(false);
+        expect(result?.children[0].children[0].common?.write).toBe(true);
+        expect(result?.children[0].children[1].common?.write).toBe(false);
 
-        expect(result?.children[1].children[0].options?.write).toBe(true);
-        expect(result?.children[1].children[1].options?.write).toBe(false);
+        expect(result?.children[1].children[0].common?.write).toBe(true);
+        expect(result?.children[1].children[1].common?.write).toBe(false);
     });
     
     it.each([
@@ -276,15 +273,15 @@ describe("deserializeAsync options: make writeable", () => {
     ("Should make all states writeable recursively (write: $write, expectedResult: $expectedResult)", async ({write, expectedResult}) => {
         const result = await model.deserializeAsync("path.to.state", '[{"name" : "John", "title" : "MD" }, {"name" : "Jane", "title" : "" }]', <Options> { write: write, forceIndex: true, autoCast: true });
         expect(result).toBeInstanceOf(JsonObject);
-        expect(result?.options?.write).toBe(expectedResult);
-        expect(result?.children[0].options?.write).toBe(expectedResult);
-        expect(result?.children[1].options?.write).toBe(expectedResult);
+        expect(result?.common?.write).toBe(expectedResult);
+        expect(result?.children[0].common?.write).toBe(expectedResult);
+        expect(result?.children[1].common?.write).toBe(expectedResult);
 
-        expect(result?.children[0].children[0].options?.write).toBe(expectedResult);
-        expect(result?.children[0].children[1].options?.write).toBe(expectedResult);
+        expect(result?.children[0].children[0].common?.write).toBe(expectedResult);
+        expect(result?.children[0].children[1].common?.write).toBe(expectedResult);
 
-        expect(result?.children[1].children[0].options?.write).toBe(expectedResult);
-        expect(result?.children[1].children[1].options?.write).toBe(expectedResult);
+        expect(result?.children[1].children[0].common?.write).toBe(expectedResult);
+        expect(result?.children[1].children[1].common?.write).toBe(expectedResult);
     });
 });
 
@@ -293,7 +290,7 @@ describe("deserializeAsync options: base64", () => {
     it("Should parse base64 content", async () => {
         const result = await model.deserializeAsync("path.to.state", input, <Options> { parseBase64: true, forceIndex: true, autoCast: true });
         expect(result).toBeInstanceOf(JsonObject);
-        expect(result?.options?.write).toBe(false);
+        expect(result?.common?.write).toBe(false);
         expect(result?.children[0].state).toBe("John");
         expect(result?.children[1].state).toBe("Johnson");
         expect(result?.children[2].state).toBe("MD");
@@ -303,7 +300,7 @@ describe("deserializeAsync options: base64", () => {
     it("Should parse base64 content by state id", async () => {
         const result = await model.deserializeAsync("path.to.state", input, <Options> { parseBase64byIds: ["path.to.state.name", "path.to.state.children.01.age"], forceIndex: true, autoCast: true });
         expect(result).toBeInstanceOf(JsonObject);
-        expect(result?.options?.write).toBe(false);
+        expect(result?.common?.write).toBe(false);
         expect(result?.children[0].state).toBe("John");
         expect(result?.children[1].state).toBe("Sm9obnNvbg==");
         expect(result?.children[2].state).toBe("TUQ=");
