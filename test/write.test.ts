@@ -1,30 +1,29 @@
 import { describe, expect, test } from '@jest/globals';
 import { Json2iob, JsonObject, Options, iobCommon } from '../src';
+import { AdapterMock } from './AdapterMock';
+
 var model : Json2iob;
+beforeEach(() => model = new Json2iob(new AdapterMock()));
 
-beforeEach(() => model = new Json2iob());
+describe("writeAsync", () => {
+    const input = `[
+        { "item": "number 1" },
+        { "item": "number 2" },
+        { "item": "number 3" },
+        { "item": "number 4" },
+        { "item": "number 5" },
+        { "item": "number 6" },
+        { "item": "number 7" },
+        { "item": "number 8" },
+        { "item": "number 9" },
+        { "item": "number 10" },
+        { "item": "number 11" }
+    ]`;
 
-describe("writeAsync options: created objects", () => {
-    it("Should not save created objects in deserializeAsync", async () => {
-        const anyModel : any = model;
-        expect(anyModel.alreadyCreatedObjects).not.toBeUndefined();
-        expect(Object.keys(anyModel.alreadyCreatedObjects)).toHaveLength(0);
-
-        await model.deserializeAsync("path.to.state", '{"name" : "John", "title" : "MD" }', <Options> { autoCast: true });
-
-        expect(Object.keys(anyModel.alreadyCreatedObjects)).toHaveLength(0);
+    it.only("Should parse base64 content", async () => {
+        const result = await model.deserializeAsync("path.to.state", input, <Options> { autoCast: true, forceIndex: true });
+        
+        expect(result).not.toBeUndefined();
+        //await model.writeAsync(result!);
     });
-    
-    /*it("Should save created objects", async () => {
-        const anyModel : any = model;
-        expect(anyModel.alreadyCreatedObjects).not.toBeUndefined();
-        expect(Object.keys(anyModel.alreadyCreatedObjects)).toHaveLength(0);
-
-        const result = await model.deserializeAsync("path.to.state", '{"name" : "John", "title" : "MD" }', <Options> { autoCast: true });
-        if (result) {
-            await model.writeAsync(result);
-        }
-
-        expect(Object.keys(anyModel.alreadyCreatedObjects)).toHaveLength(0);
-    });*/
 });

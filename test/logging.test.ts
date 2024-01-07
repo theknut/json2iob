@@ -1,7 +1,7 @@
 import { expect, test } from '@jest/globals';
 import { Json2iob } from '../src';
+import { AdapterMock } from './AdapterMock';
 
-var fakeAdapter : FakeAdapter;
 var consoleDebug  = console.debug;
 var consoleWarn  = console.warn;
 var consoleError  = console.error;
@@ -25,7 +25,6 @@ beforeEach(() => {
     debugMessages = [];
     warnMessages = [];
     errorMessages = [];
-    fakeAdapter = new FakeAdapter();
 })
 
 test("Uses console logging if no adapter is provided", () => {    
@@ -44,38 +43,20 @@ test("Uses console logging if no adapter is provided", () => {
 });
 
 test("Uses adapter logging if adapter is provided", () => {
-    var model : any = new Json2iob(fakeAdapter);
+    var model : any = new Json2iob(new AdapterMock());
     model.log.debug("🥑");
     model.log.warn("🍓");
     model.log.error("🍉");
     
-    expect(model.adapter.debugMessages).toHaveLength(1);
-    expect(model.adapter.warnMessages).toHaveLength(1);
-    expect(model.adapter.errorMessages).toHaveLength(1);
+    expect(model.adapter.log.debugMessages).toHaveLength(1);
+    expect(model.adapter.log.warnMessages).toHaveLength(1);
+    expect(model.adapter.log.errorMessages).toHaveLength(1);
 
-    expect(model.adapter.debugMessages.pop()).toBe("🥑");
-    expect(model.adapter.warnMessages.pop()).toBe("🍓");
-    expect(model.adapter.errorMessages.pop()).toBe("🍉");
+    expect(model.adapter.log.debugMessages.pop()).toBe("🥑");
+    expect(model.adapter.log.warnMessages.pop()).toBe("🍓");
+    expect(model.adapter.log.errorMessages.pop()).toBe("🍉");
     
     expect(debugMessages).toHaveLength(0);
     expect(warnMessages).toHaveLength(0);
     expect(errorMessages).toHaveLength(0);
 });
-
-class FakeAdapter {
-    debugMessages : string[] = [];
-    warnMessages : string[] = [];
-    errorMessages : string[] = [];
-
-    debug(message: string) {
-        this.debugMessages.push(message);
-    }
-
-    warn(message: string) {        
-        this.warnMessages.push(message);
-    }
-
-    error(message: string) {        
-        this.errorMessages.push(message);
-    }
-}

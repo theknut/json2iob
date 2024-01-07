@@ -368,6 +368,16 @@ describe("deserializeAsync options: array index", () => {
     });
 });
 
+it("Should not save created objects in deserializeAsync", async () => {
+    const anyModel : any = model;
+    expect(anyModel.alreadyCreatedObjects).not.toBeUndefined();
+    expect(Object.keys(anyModel.alreadyCreatedObjects)).toHaveLength(0);
+
+    await model.deserializeAsync("path.to.state", '{ "🥜" : "🥑" } ', <Options> { autoCast: true });
+
+    expect(Object.keys(anyModel.alreadyCreatedObjects)).toHaveLength(0);
+});
+
 function testObject(object: JsonObject, path: string, state: any | undefined, role: string, type: string) {
     expect(object.path).toBe(path);
     expect(object.state).toBe(state);
